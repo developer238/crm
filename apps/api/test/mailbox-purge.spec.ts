@@ -12,6 +12,14 @@ import type { MailboxMatchService } from "../src/mailbox/mailbox-match.service";
 import { MailboxTokenService } from "../src/mailbox/mailbox-token.service";
 import { SyncStateService } from "../src/mailbox/sync-state.service";
 import { MicrosoftConnectionService } from "../src/microsoft/microsoft-connection.service";
+import {
+	createTestProject,
+	destroyTestProject,
+	type TestProject,
+} from "./project-fixture";
+
+let fixture: TestProject;
+let projectId = "";
 
 const suffix = process.env.TEST_RUN_ID ?? "mailbox-purge-spec";
 const domain = `purge-${suffix}.test`;
@@ -63,6 +71,7 @@ async function thread(
 
 	await db.emailThread.create({
 		data: {
+			projectId,
 			rootMessageId,
 			subject: first.subject,
 			companyId,
@@ -71,6 +80,7 @@ async function thread(
 			messageCount: messages.length,
 			messages: {
 				create: messages.map((message) => ({
+					projectId,
 					rfcMessageId: `${message.id}@${domain}`,
 					syncedByUserId: message.syncedByUserId,
 					gmailMessageId: message.provider === "gmail" ? message.id : null,
@@ -85,6 +95,7 @@ async function thread(
 			},
 			activity: {
 				create: {
+					projectId,
 					type: ActivityType.EMAIL,
 					subject: first.subject,
 					body: last.snippet,
@@ -99,8 +110,11 @@ async function thread(
 }
 
 async function seed(): Promise<void> {
+	fixture = await createTestProject("mailbox-purge");
+	projectId = fixture.projectId;
+
 	const company = await db.company.create({
-		data: { name: "Purge Co", domain },
+		data: { projectId, name: "Purge Co", domain },
 		select: { id: true },
 	});
 
@@ -155,6 +169,7 @@ async function seed(): Promise<void> {
 
 	await db.calendarEvent.create({
 		data: {
+			projectId,
 			iCalUid: `ical-${suffix}`,
 			originalStartTime: at(12),
 			startsAt: at(12),
@@ -167,6 +182,8 @@ async function seed(): Promise<void> {
 }
 
 async function clean(): Promise<void> {
+	await destroyTestProject(fixture ?? null);
+
 	await db.calendarEvent.deleteMany({
 		where: { syncedByUserId: { in: userIds } },
 	});
@@ -189,7 +206,9 @@ async function messagesOn(rootMessageId: string): Promise<string[]> {
 
 async function threadState(rootMessageId: string) {
 	return db.emailThread.findUnique({
-		where: { rootMessageId },
+		where: {
+			projectId_rootMessageId: { projectId, rootMessageId },
+		},
 		select: {
 			subject: true,
 			messageCount: true,

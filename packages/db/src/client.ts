@@ -11,6 +11,18 @@ if (!connectionString) {
 	);
 }
 
+function schemaOf(url: string): string {
+	try {
+		return new URL(url).searchParams.get("schema") ?? "public";
+	} catch {
+		return "public";
+	}
+}
+
+const schema = schemaOf(connectionString);
+
+const poolMax = Number(process.env.DATABASE_POOL_MAX ?? 5);
+
 export interface PrismaLogRecord {
 	level: Prisma.LogLevel;
 	message: string;
@@ -54,7 +66,15 @@ const logDefinitions: Prisma.LogDefinition[] = [
 
 const createPrismaClient = () => {
 	const client = new PrismaClient({
-		adapter: new PrismaPg({ connectionString }),
+		adapter: new PrismaPg(
+			{
+				connectionString,
+				max: poolMax,
+				idleTimeoutMillis: 10_000,
+				options: `-c search_path=${schema},public`,
+			},
+			{ schema },
+		),
 		log: logDefinitions,
 	});
 

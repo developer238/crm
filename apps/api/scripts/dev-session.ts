@@ -1,3 +1,4 @@
+import { ensureOrganizationMembership } from "@crm/auth";
 import { AUTH_COOKIE_PREFIX } from "@crm/auth/cookies";
 import { db } from "@crm/db";
 
@@ -47,6 +48,14 @@ const user = await db.user.upsert({
 	update: {},
 });
 
+const organizationId = await ensureOrganizationMembership(user.id);
+
+if (!organizationId) {
+	throw new Error(
+		"Could not enrol the dev user in an organization; the session would have no project.",
+	);
+}
+
 const token = `dev-session-${user.id}`;
 const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -56,6 +65,7 @@ await db.session.upsert({
 		id: token,
 		token,
 		userId: user.id,
+		activeOrganizationId: organizationId,
 		expiresAt,
 		updatedAt: new Date(),
 	},

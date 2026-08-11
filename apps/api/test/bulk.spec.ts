@@ -10,6 +10,7 @@ import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "bulk-spec";
 const domain = `bulk-${suffix}.test`;
@@ -66,7 +67,13 @@ async function clean() {
 	await db.user.deleteMany({ where: { id: { in: [ownerId, secondOwnerId] } } });
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
+
 	await clean();
 
 	await db.user.createMany({
@@ -77,7 +84,7 @@ beforeAll(async () => {
 	});
 
 	const company = await db.company.create({
-		data: { name: `Bulk Co ${suffix}`, domain },
+		data: { projectId, name: `Bulk Co ${suffix}`, domain },
 		select: { id: true },
 	});
 	companyId = company.id;

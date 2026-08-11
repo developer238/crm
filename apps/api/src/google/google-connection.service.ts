@@ -7,6 +7,7 @@ import { InjectDatabase } from "../database/database.constants";
 import { MailboxMatchService } from "../mailbox/mailbox-match.service";
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
 import { SyncStateService } from "../mailbox/sync-state.service";
+import { currentProjectId } from "../projects/project-context";
 import {
 	GOOGLE_PROVIDER_ID,
 	GOOGLE_SYNC_SOURCES,
@@ -202,15 +203,23 @@ export class GoogleConnectionService {
 		}
 
 		await this.db.suppressedDomain.upsert({
-			where: { domain: normalised },
-			create: { domain: normalised, reason: options.reason ?? null },
+			where: {
+				projectId_domain: { projectId: currentProjectId(), domain: normalised },
+			},
+			create: {
+				projectId: currentProjectId(),
+				domain: normalised,
+				reason: options.reason ?? null,
+			},
 			update: { reason: options.reason ?? null },
 		});
 
 		if (!options.purge) return { domain: normalised, purged: 0 };
 
 		const company = await this.db.company.findUnique({
-			where: { domain: normalised },
+			where: {
+				projectId_domain: { projectId: currentProjectId(), domain: normalised },
+			},
 			select: { id: true },
 		});
 

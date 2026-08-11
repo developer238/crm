@@ -1,4 +1,5 @@
 import { db, EnrichmentStatus } from "@crm/db";
+import { currentProjectId } from "./focus";
 import { domainOf, isDerivedName } from "./names";
 import type { Person } from "./socials";
 
@@ -367,6 +368,7 @@ export async function writeTimelineNote(
 
 	const activity = await db.activity.create({
 		data: {
+			projectId: currentProjectId(),
 			type: "NOTE",
 			subject,
 			body,

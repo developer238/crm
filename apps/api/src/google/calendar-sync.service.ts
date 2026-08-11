@@ -16,6 +16,7 @@ import {
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
 import { isMachineAddress, type Participant } from "../mailbox/participants";
 import { SyncStateService } from "../mailbox/sync-state.service";
+import { currentProjectId } from "../projects/project-context";
 import {
 	CalendarClient,
 	conferenceUrl,
@@ -202,7 +203,8 @@ export class CalendarSyncService {
 		if (!originalStart) return "ignored";
 
 		const key = {
-			iCalUid_originalStartTime: {
+			projectId_iCalUid_originalStartTime: {
+				projectId: currentProjectId(),
 				iCalUid,
 				originalStartTime: originalStart.at,
 			},
@@ -246,6 +248,7 @@ export class CalendarSyncService {
 		const record = await this.db.calendarEvent.upsert({
 			where: key,
 			create: {
+				projectId: currentProjectId(),
 				iCalUid,
 				originalStartTime: originalStart.at,
 				recurringEventId: event.recurringEventId ?? null,
@@ -324,6 +327,7 @@ export class CalendarSyncService {
 			await this.db.calendarAttendee.upsert({
 				where: { eventId_email: { eventId, email } },
 				create: {
+					projectId: currentProjectId(),
 					eventId,
 					email,
 					name: attendee.displayName ?? null,
@@ -380,6 +384,7 @@ export class CalendarSyncService {
 		const activity = await this.db.activity.upsert({
 			where: { calendarEventId },
 			create: {
+				projectId: currentProjectId(),
 				type: ActivityType.MEETING,
 				subject: summary.title,
 				body,

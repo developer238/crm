@@ -4,12 +4,13 @@ export { isGoogleConfigured, isMicrosoftConfigured } from "./env";
 export {
 	canChangeRole,
 	canManageCurrency,
+	canManageProjects,
 	canRenameWorkspace,
-	DEFAULT_WORKSPACE_NAME,
-	ensureWorkspaceMembership,
+	DEFAULT_ORGANIZATION_NAME,
+	ensureOrganizationMembership,
 	isWorkspaceAdmin,
 	isWorkspaceRole,
-	WORKSPACE_ID,
+	organizationSlug,
 	WORKSPACE_ROLES,
 	type WorkspaceRole,
 } from "./organization";

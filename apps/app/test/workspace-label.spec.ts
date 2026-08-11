@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME } from "@crm/auth";
+import { DEFAULT_ORGANIZATION_NAME } from "@crm/auth";
 import { workspaceLabel } from "../lib/workspace-label";
 
 describe("what the header calls this install", () => {
 	it("does not say CRM twice before anybody has named the workspace", () => {
-		expect(workspaceLabel(DEFAULT_WORKSPACE_NAME)).toBe("CRM");
+		expect(workspaceLabel(DEFAULT_ORGANIZATION_NAME)).toBe("CRM");
 	});
 
 	it("falls back to CRM while the workspace is still loading", () => {

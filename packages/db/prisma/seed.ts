@@ -7,7 +7,48 @@ import {
 	DealStage,
 	RateSource,
 } from "../src/generated/prisma/enums";
-import { readReportingCurrency, SETTINGS_ID } from "../src/settings";
+import { forProject, type ProjectDb, projectSlug } from "../src/project";
+import { readReportingCurrency } from "../src/settings";
+
+const SEED_ORGANIZATION_ID = "seed-organization";
+
+const SEED_PROJECT_NAME = "Demo";
+
+let projectId = "";
+
+let pdb: ProjectDb;
+
+async function seedProject(): Promise<void> {
+	const organization = await db.organization.upsert({
+		where: { id: SEED_ORGANIZATION_ID },
+		create: {
+			id: SEED_ORGANIZATION_ID,
+			name: "CRM",
+			slug: "crm",
+			createdAt: new Date(),
+		},
+		update: {},
+		select: { id: true },
+	});
+
+	const slugged = projectSlug(SEED_PROJECT_NAME);
+
+	const project = await db.project.upsert({
+		where: {
+			organizationId_slug: { organizationId: organization.id, slug: slugged },
+		},
+		create: {
+			organizationId: organization.id,
+			name: SEED_PROJECT_NAME,
+			slug: slugged,
+		},
+		update: {},
+		select: { id: true },
+	});
+
+	projectId = project.id;
+	pdb = forProject(db, projectId);
+}
 
 function makeRandom(seed: number): () => number {
 	let a = seed;
@@ -370,9 +411,12 @@ async function seedCompanies(
 	const companies = [];
 
 	for (const company of COMPANIES) {
-		const row = await db.company.upsert({
-			where: { domain: company.domain },
+		const row = await pdb.company.upsert({
+			where: {
+				projectId_domain: { projectId, domain: company.domain },
+			},
 			create: {
+				projectId,
 				name: company.name,
 				domain: company.domain,
 				website: `https://${company.domain}`,
@@ -410,7 +454,7 @@ async function seedIcons(
 		const iconUrl =
 			(await mirror(source, `companies/${company.id}/icon`)) ?? source;
 
-		await db.company.updateMany({
+		await pdb.company.updateMany({
 			where: { id: company.id, iconUrl: null },
 			data: { iconUrl },
 		});
@@ -437,9 +481,10 @@ async function seedContacts(
 			if (used.has(email)) continue;
 			used.add(email);
 
-			const contact = await db.contact.upsert({
-				where: { email },
+			const contact = await pdb.contact.upsert({
+				where: { projectId_email: { projectId, email } },
 				create: {
+					projectId,
 					firstName,
 					lastName,
 					email,
@@ -491,17 +536,17 @@ let seedBase = "USD";
 async function seedRates(): Promise<number> {
 	const asOf = daysFromNow(-1);
 
-	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
+	await pdb.appSetting.upsert({
+		where: { projectId },
 		create: {
-			id: SETTINGS_ID,
+			projectId,
 			reportingCurrency: DEFAULT_REPORTING_CURRENCY,
 		},
 		update: {},
-		select: { id: true },
+		select: { projectId: true },
 	});
 
-	seedBase = await readReportingCurrency(db);
+	seedBase = await readReportingCurrency(db, projectId);
 
 	if (seedBase !== "USD") {
 		console.log(
@@ -580,9 +625,10 @@ async function seedDeals(
 				12,
 			);
 
-			await db.deal.upsert({
+			await pdb.deal.upsert({
 				where: { id },
 				create: {
+					projectId,
 					id,
 					name:
 						n === 0
@@ -625,9 +671,10 @@ async function seedDeals(
 				(contact) => contact.companyId === company.id,
 			);
 			for (const contact of companyContacts.slice(0, integer(1, 2))) {
-				await db.dealContact.upsert({
+				await pdb.dealContact.upsert({
 					where: { dealId_contactId: { dealId: id, contactId: contact.id } },
 					create: {
+						projectId,
 						dealId: id,
 						contactId: contact.id,
 						role: chance(0.5) ? "Champion" : "Decision maker",
@@ -656,6 +703,7 @@ async function seedActivities(
 	}
 
 	type ActivityRow = {
+		projectId: string;
 		type: ActivityType;
 		subject: string | null;
 		body: string | null;
@@ -673,6 +721,7 @@ async function seedActivities(
 	const rows: ActivityRow[] = [];
 
 	const base = (companyId: string, createdById: string, createdAt: Date) => ({
+		projectId,
 		companyId,
 		contactId: null,
 		dealId: null,
@@ -758,11 +807,12 @@ async function seedActivities(
 		});
 	}
 
-	await db.activity.createMany({ data: rows });
+	await pdb.activity.createMany({ data: rows });
 	return rows.length;
 }
 
 async function main() {
+	await seedProject();
 	const rates = await seedRates();
 	const ownerIds = await seedOwners();
 	const companies = await seedCompanies(ownerIds);

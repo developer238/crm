@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentDefinitionsService } from "../src/agent/agent-definitions.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = crypto.randomUUID();
 const userId = `agent-delete-user-${suffix}`;
@@ -40,17 +39,12 @@ async function clean() {
 	await db.user.deleteMany({ where: { id: userId } });
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: WORKSPACE_ID },
-		update: {},
-		create: {
-			id: WORKSPACE_ID,
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
 	await db.user.create({
 		data: {
 			id: userId,
@@ -61,7 +55,7 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: WORKSPACE_ID,
+			organizationId: fixture.organizationId,
 			userId,
 			role: "member",
 			createdAt: new Date(),
@@ -70,6 +64,7 @@ beforeAll(async () => {
 
 	const agent = await db.agentDefinition.create({
 		data: {
+			projectId,
 			name: "Delete me",
 			status: "PAUSED",
 			createdById: userId,
@@ -80,6 +75,7 @@ beforeAll(async () => {
 
 	const version = await db.agentVersion.create({
 		data: {
+			projectId,
 			agentId,
 			number: 1,
 			status: "DEPLOYED",
@@ -101,6 +97,7 @@ beforeAll(async () => {
 
 	const trigger = await db.agentTrigger.create({
 		data: {
+			projectId,
 			agentId,
 			versionId,
 			type: "SCHEDULE",
@@ -117,6 +114,7 @@ beforeAll(async () => {
 	const [queued, waiting, running, delivery] = await Promise.all([
 		db.agentRun.create({
 			data: {
+				projectId,
 				agentId,
 				versionId,
 				triggerId,
@@ -129,6 +127,7 @@ beforeAll(async () => {
 		}),
 		db.agentRun.create({
 			data: {
+				projectId,
 				agentId,
 				versionId,
 				triggerType: "MANUAL",
@@ -140,6 +139,7 @@ beforeAll(async () => {
 		}),
 		db.agentRun.create({
 			data: {
+				projectId,
 				agentId,
 				versionId,
 				triggerType: "MANUAL",
@@ -153,6 +153,7 @@ beforeAll(async () => {
 		}),
 		db.agentRun.create({
 			data: {
+				projectId,
 				agentId,
 				versionId,
 				triggerType: "MANUAL",

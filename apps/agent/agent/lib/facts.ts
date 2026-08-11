@@ -1,6 +1,6 @@
 import { db, FactBand, FactStatus } from "@crm/db";
 import { type Evidence, scoreEvidence } from "./evidence";
-import { currentFocus } from "./focus";
+import { currentFocus, currentProjectId } from "./focus";
 import { isDerivedName, splitName } from "./names";
 
 const FIELDS = {
@@ -147,6 +147,7 @@ export async function recordFact(
 
 		await tx.contactFact.create({
 			data: {
+				projectId: currentProjectId(),
 				contactId,
 				field,
 				value: trimmed,
@@ -253,7 +254,11 @@ export async function writeBrief(input: {
 
 	await db.contactBrief.upsert({
 		where: { contactId: input.contactId },
-		create: { contactId: input.contactId, ...data },
+		create: {
+			projectId: currentProjectId(),
+			contactId: input.contactId,
+			...data,
+		},
 		update: data,
 	});
 

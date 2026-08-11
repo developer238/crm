@@ -1,5 +1,6 @@
 import { db } from "@crm/db";
 import { readAgentModel } from "@crm/db/settings";
+import { currentProjectId } from "./focus";
 
 export interface ModelSelection {
 	model: string;
@@ -8,7 +9,7 @@ export interface ModelSelection {
 
 export async function selectedModel(): Promise<ModelSelection | null> {
 	try {
-		const setting = await readAgentModel(db);
+		const setting = await readAgentModel(db, currentProjectId());
 
 		if (setting.isDefault) return null;
 

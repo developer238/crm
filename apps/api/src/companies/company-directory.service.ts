@@ -1,7 +1,10 @@
 import { type Db, EnrichmentStatus } from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import { domainFromEmail } from "./domain";
 
 @Injectable()
@@ -9,7 +12,7 @@ export class CompanyDirectoryService {
 	private readonly logger = new Logger(CompanyDirectoryService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly agent: AgentTriggerService,
 	) {}
 
@@ -21,14 +24,15 @@ export class CompanyDirectoryService {
 		if (!domain) return null;
 
 		const existing = await this.db.company.findUnique({
-			where: { domain },
+			where: { projectId_domain: { projectId: currentProjectId(), domain } },
 			select: { id: true },
 		});
 		if (existing) return existing.id;
 
 		const company = await this.db.company.upsert({
-			where: { domain },
+			where: { projectId_domain: { projectId: currentProjectId(), domain } },
 			create: {
+				projectId: currentProjectId(),
 				name: domain,
 				domain,
 				website: `https://${domain}`,

@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { db, type Prisma } from "@crm/db";
 import { readAgentModel } from "@crm/db/settings";
+import { currentProjectId } from "./focus";
 
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
@@ -90,6 +91,7 @@ export async function writeBuilderArtifact(
 
 		const artifact = await tx.agentBuilderArtifact.create({
 			data: {
+				projectId: currentProjectId(),
 				conversationId,
 				path,
 				language: ARTIFACT_LANGUAGES[path],
@@ -188,7 +190,7 @@ export async function saveBuilderDraft(
 		};
 	}
 
-	const model = await readAgentModel(db);
+	const model = await readAgentModel(db, currentProjectId());
 	const now = new Date();
 	const nextRunAt = scheduleDate(input.trigger, now);
 	const manifest = {
@@ -245,6 +247,7 @@ export async function saveBuilderDraft(
 		if (!agentId) {
 			const agent = await tx.agentDefinition.create({
 				data: {
+					projectId: currentProjectId(),
 					name: input.name,
 					description: input.description,
 					createdById: userId,
@@ -313,6 +316,7 @@ export async function saveBuilderDraft(
 		const number = (latest?.number ?? 0) + 1;
 		const version = await tx.agentVersion.create({
 			data: {
+				projectId: currentProjectId(),
 				agentId,
 				number,
 				status: "READY",
@@ -336,6 +340,7 @@ export async function saveBuilderDraft(
 
 		await tx.agentTrigger.create({
 			data: {
+				projectId: currentProjectId(),
 				agentId,
 				versionId: version.id,
 				type: input.trigger.type,
@@ -349,6 +354,7 @@ export async function saveBuilderDraft(
 		if (created) {
 			await tx.agentAuditEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId,
 					actorUserId: userId,
 					actorType: "USER",
@@ -362,6 +368,7 @@ export async function saveBuilderDraft(
 
 		await tx.agentAuditEvent.create({
 			data: {
+				projectId: currentProjectId(),
 				agentId,
 				versionId: version.id,
 				actorUserId: userId,
@@ -423,6 +430,7 @@ async function persistArtifactSnapshots(
 
 		await tx.agentBuilderArtifact.create({
 			data: {
+				projectId: currentProjectId(),
 				conversationId,
 				versionId,
 				path: file.path,

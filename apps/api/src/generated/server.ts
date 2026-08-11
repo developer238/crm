@@ -24,6 +24,7 @@ import { dealListInput, dealIdInput, dealCreateInput, dealUpdateArgs, setStageIn
 import { fieldListInput, fieldByKeyInput, fieldIdInput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput } from "../fields/fields.contracts";
 import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInput } from "../google/google.contracts";
 import { setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
+import { createProjectInput } from "../projects/projects.contracts";
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
 import { memberListInput, updateWorkspaceInput, setMemberRoleInput } from "../workspace/workspace.contracts";
@@ -38,6 +39,7 @@ import type { DealsRouter } from "../deals/deals.router";
 import type { FieldsRouter } from "../fields/fields.router";
 import type { GoogleRouter } from "../google/google.router";
 import type { MicrosoftRouter } from "../microsoft/microsoft.router";
+import type { ProjectsRouter } from "../projects/projects.router";
 import type { SearchRouter } from "../search/search.router";
 import type { SettingsRouter } from "../settings/settings.router";
 import type { SsoRouter } from "../sso/sso.router";
@@ -348,6 +350,15 @@ const appRouter = t.router({
     setAutoCreate: publicProcedure
       .input(setOutlookAutoCreateInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<MicrosoftRouter["setAutoCreate"]>>)
+    }),
+  projects: t.router({
+    list: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ProjectsRouter["list"]>>),
+    current: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ProjectsRouter["current"]>>),
+    create: publicProcedure
+      .input(createProjectInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ProjectsRouter["create"]>>)
     }),
   search: t.router({
     quick: publicProcedure

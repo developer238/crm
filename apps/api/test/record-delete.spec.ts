@@ -11,6 +11,7 @@ import { EnrichmentLogService } from "../src/crm/enrichment-log.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { MailboxMatchService } from "../src/mailbox/mailbox-match.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "record-delete-spec";
 const domain = `delete-${suffix}.test`;
@@ -72,6 +73,7 @@ const ours = {
 async function parked(subject: { contactId?: string; companyId?: string }) {
 	return db.agentTask.create({
 		data: {
+			projectId,
 			...subject,
 			kind: "identify",
 			reason: `record-delete-spec (${suffix})`,
@@ -109,7 +111,13 @@ async function clean() {
 	await db.user.deleteMany({ where: { id: userId } });
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
+
 	await clean();
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
@@ -134,6 +142,7 @@ describe("deleting a contact", () => {
 
 		await db.agentEvent.create({
 			data: {
+				projectId,
 				id: `evt-${suffix}`,
 				sessionId: `ses-${suffix}`,
 				contactId,
@@ -157,7 +166,7 @@ describe("deleting a contact", () => {
 
 	it("remembers the address so the sync cannot bring them back", async () => {
 		const suppressed = await db.suppressedContact.findUnique({
-			where: { email },
+			where: { projectId_email: { projectId, email } },
 		});
 		expect(suppressed).not.toBeNull();
 
@@ -192,7 +201,9 @@ describe("deleting a contact", () => {
 
 		expect(result.external.map((person) => person.email)).toEqual([colleague]);
 
-		const created = await db.contact.findFirst({ where: { email: colleague } });
+		const created = await db.contact.findFirst({
+			where: { projectId, email: colleague },
+		});
 		expect(created?.id).toBe(result.contactId ?? undefined);
 	});
 
@@ -200,7 +211,9 @@ describe("deleting a contact", () => {
 		const readded = await contacts.create({ firstName: "Gone", email });
 
 		expect(
-			await db.suppressedContact.findUnique({ where: { email } }),
+			await db.suppressedContact.findUnique({
+				where: { projectId_email: { projectId, email } },
+			}),
 		).toBeNull();
 
 		await db.contact.delete({ where: { id: readded.id } });
@@ -223,7 +236,9 @@ describe("deleting a contact", () => {
 		await contacts.delete(created.id);
 
 		expect(
-			await db.suppressedContact.findUnique({ where: { email: asSynced } }),
+			await db.suppressedContact.findUnique({
+				where: { projectId_email: { projectId, email: asSynced } },
+			}),
 		).not.toBeNull();
 
 		const result = await match.resolve(
@@ -238,7 +253,7 @@ describe("deleting a contact", () => {
 
 		expect(result.external).toEqual([]);
 		expect(
-			await db.contact.findFirst({ where: { email: asSynced } }),
+			await db.contact.findFirst({ where: { projectId, email: asSynced } }),
 		).toBeNull();
 	});
 });
@@ -256,7 +271,12 @@ describe("deleting a company", () => {
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { name: "Doomed deal", companyId: company.id, ownerId: userId },
+			data: {
+				projectId,
+				name: "Doomed deal",
+				companyId: company.id,
+				ownerId: userId,
+			},
 			select: { id: true },
 		});
 
@@ -294,13 +314,19 @@ describe("the activity stamps a delete leaves behind", () => {
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { name: "Stamped deal", companyId: company.id, ownerId: userId },
+			data: {
+				projectId,
+				name: "Stamped deal",
+				companyId: company.id,
+				ownerId: userId,
+			},
 			select: { id: true },
 		});
 
 		const at = new Date();
 		await db.activity.create({
 			data: {
+				projectId,
 				type: "NOTE",
 				subject: "The only thing on this account",
 				companyId: company.id,
@@ -342,13 +368,19 @@ describe("the activity stamps a delete leaves behind", () => {
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { name: "Orphaned deal", companyId: company.id, ownerId: userId },
+			data: {
+				projectId,
+				name: "Orphaned deal",
+				companyId: company.id,
+				ownerId: userId,
+			},
 			select: { id: true },
 		});
 
 		const at = new Date();
 		await db.activity.create({
 			data: {
+				projectId,
 				type: "MEETING",
 				subject: "Only ever attached to the deal",
 				contactId: contact.id,

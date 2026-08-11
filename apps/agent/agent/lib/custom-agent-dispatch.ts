@@ -1,5 +1,6 @@
 import { db, type Prisma } from "@crm/db";
 import type { SendFn } from "eve/channels";
+import { currentProjectId } from "./focus";
 import { lockAgentRun, runTerminalEventId } from "./run-state";
 
 const BUILDER_BATCH = 20;
@@ -232,6 +233,7 @@ export async function queueDueAgentRuns(now = new Date()): Promise<number> {
 			await tx.agentRun.upsert({
 				where: { idempotencyKey },
 				create: {
+					projectId: currentProjectId(),
 					agentId: trigger.agentId,
 					versionId: trigger.versionId,
 					triggerId: trigger.id,
@@ -240,7 +242,12 @@ export async function queueDueAgentRuns(now = new Date()): Promise<number> {
 					correlationId: crypto.randomUUID(),
 					input: { scheduledFor: scheduledAt.toISOString() },
 					events: {
-						create: { sequence: 0, type: "run.queued", data: {} },
+						create: {
+							projectId: currentProjectId(),
+							sequence: 0,
+							type: "run.queued",
+							data: {},
+						},
 					},
 				},
 				update: {},
@@ -368,6 +375,7 @@ export async function failRun(runId: string, code: string, message: string) {
 		});
 		await tx.agentRunEvent.create({
 			data: {
+				projectId: currentProjectId(),
 				id: runTerminalEventId(run.id, "failed"),
 				runId: run.id,
 				sequence,
@@ -385,6 +393,7 @@ export async function failRun(runId: string, code: string, message: string) {
 				},
 			},
 			create: {
+				projectId: currentProjectId(),
 				agentId: run.agentId,
 				versionId: run.versionId,
 				actorType: "AGENT",
@@ -532,6 +541,7 @@ async function recoverAgentRuns() {
 			});
 			await tx.agentRunEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					id: `run-delivery-${cancelled ? "cancelled" : "recovered"}:${run.id}:${run.startedAt.toISOString()}`,
 					runId: run.id,
 					sequence,

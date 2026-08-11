@@ -12,6 +12,7 @@ import {
 	usesOptions,
 	writeValues,
 } from "@crm/db/fields";
+import { currentProjectId } from "./focus";
 
 const WITH_OPTIONS = { options: { orderBy: { position: "asc" } } } as const;
 
@@ -104,7 +105,13 @@ export async function createField(input: {
 	}
 
 	const taken = await db.fieldDefinition.findUnique({
-		where: { entity_key: { entity: input.entity, key } },
+		where: {
+			projectId_entity_key: {
+				projectId: currentProjectId(),
+				entity: input.entity,
+				key,
+			},
+		},
 		select: { id: true },
 	});
 
@@ -127,6 +134,7 @@ export async function createField(input: {
 
 	const definition = await db.fieldDefinition.create({
 		data: {
+			projectId: currentProjectId(),
 			entity: input.entity,
 			key,
 			label: input.label,
@@ -136,6 +144,7 @@ export async function createField(input: {
 			options: usesOptions(input.type)
 				? {
 						create: (input.options ?? []).map((label, index) => ({
+							projectId: currentProjectId(),
 							label,
 							position: index,
 						})),
@@ -155,7 +164,13 @@ export async function updateFieldBrief(input: {
 	agentFilled?: boolean;
 }): Promise<SerializedField | { updated: false; reason: string }> {
 	const existing = await db.fieldDefinition.findUnique({
-		where: { entity_key: { entity: input.entity, key: input.key } },
+		where: {
+			projectId_entity_key: {
+				projectId: currentProjectId(),
+				entity: input.entity,
+				key: input.key,
+			},
+		},
 		select: { id: true },
 	});
 
@@ -180,7 +195,13 @@ export async function archiveField(input: {
 	key: string;
 }): Promise<{ archived: boolean; reason?: string }> {
 	const existing = await db.fieldDefinition.findUnique({
-		where: { entity_key: { entity: input.entity, key: input.key } },
+		where: {
+			projectId_entity_key: {
+				projectId: currentProjectId(),
+				entity: input.entity,
+				key: input.key,
+			},
+		},
 		select: { id: true },
 	});
 

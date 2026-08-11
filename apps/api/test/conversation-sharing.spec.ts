@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { ConversationSharingService } from "../src/conversations/conversation-sharing.service";
 import { ConversationsService } from "../src/conversations/conversations.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = crypto.randomUUID();
 const userId = `share-user-${suffix}`;
@@ -17,17 +16,12 @@ let attachmentId = "";
 const service = new ConversationSharingService(db);
 const conversations = new ConversationsService(db);
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: WORKSPACE_ID },
-		update: {},
-		create: {
-			id: WORKSPACE_ID,
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
 	await db.user.createMany({
 		data: [
 			{ id: userId, name: "Share Owner", email: `${userId}@example.test` },
@@ -47,14 +41,14 @@ beforeAll(async () => {
 		data: [
 			{
 				id: memberId,
-				organizationId: WORKSPACE_ID,
+				organizationId: fixture.organizationId,
 				userId,
 				role: "member",
 				createdAt: new Date(),
 			},
 			{
 				id: viewerMemberId,
-				organizationId: WORKSPACE_ID,
+				organizationId: fixture.organizationId,
 				userId: viewerId,
 				role: "member",
 				createdAt: new Date(),
@@ -63,6 +57,7 @@ beforeAll(async () => {
 	});
 	const conversation = await db.agentConversation.create({
 		data: {
+			projectId,
 			kind: "BUILDER",
 			userId,
 			title: "Share safely",
@@ -73,6 +68,7 @@ beforeAll(async () => {
 	conversationId = conversation.id;
 	const submission = await db.agentConversationSubmission.create({
 		data: {
+			projectId,
 			conversationId,
 			submittedById: userId,
 			clientRequestId: crypto.randomUUID(),
@@ -83,6 +79,7 @@ beforeAll(async () => {
 			},
 			attachments: {
 				create: {
+					projectId,
 					name: "shared.png",
 					mediaType: "image/png",
 					size: 4,

@@ -7,6 +7,7 @@ import { AgentModule } from "./agent/agent.module";
 import { AuthModule } from "./auth/auth.module";
 import { BackfillModule } from "./backfill/backfill.module";
 import { AppCacheModule } from "./cache/cache.module";
+import { ChangesModule } from "./changes/changes.module";
 import { CompaniesModule } from "./companies/companies.module";
 import { validateEnv } from "./config/env.validation";
 import { ContactsModule } from "./contacts/contacts.module";
@@ -23,6 +24,8 @@ import { LoggingModule } from "./logging/logging.module";
 import { logAuthRoute } from "./logging/request-logger.middleware";
 import { MailboxModule } from "./mailbox/mailbox.module";
 import { MicrosoftModule } from "./microsoft/microsoft.module";
+import { ProjectContextModule } from "./projects/project-context.module";
+import { ProjectsModule } from "./projects/projects.module";
 import { SearchModule } from "./search/search.module";
 import { SettingsModule } from "./settings/settings.module";
 import { SsoModule } from "./sso/sso.module";
@@ -42,6 +45,9 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		}),
 		AppCacheModule,
 		DatabaseModule,
+		ProjectContextModule,
+		ChangesModule,
+		ProjectsModule,
 		CrmModule,
 		BetterAuthModule.forRoot({ auth, middleware: logAuthRoute }),
 		AuthModule,

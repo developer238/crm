@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { isGoogleConfigured, WORKSPACE_ID } from "@crm/auth";
+import { isGoogleConfigured } from "@crm/auth";
 import type { Db } from "@crm/db";
 import { ForbiddenException } from "@nestjs/common";
 import { SsoService } from "../src/sso/sso.service";
+
+const TEST_ORGANIZATION_ID = "sso-spec-organization";
 
 type Row = {
 	providerId: string;
@@ -107,7 +109,9 @@ describe("what a provider looks like once it is saved", () => {
 		const { sso, seen } = service("owner", [OKTA]);
 		await sso.list(LIST);
 
-		expect(seen.providerWhere).toEqual({ organizationId: WORKSPACE_ID });
+		expect(seen.providerWhere).toEqual({
+			organizationId: TEST_ORGANIZATION_ID,
+		});
 	});
 
 	it("searches the name, the domain and the issuer", async () => {
@@ -115,7 +119,7 @@ describe("what a provider looks like once it is saved", () => {
 		await sso.list({ ...LIST, q: " acme " });
 
 		expect(seen.providerWhere).toEqual({
-			organizationId: WORKSPACE_ID,
+			organizationId: TEST_ORGANIZATION_ID,
 			OR: [
 				{ providerId: { contains: "acme", mode: "insensitive" } },
 				{ domain: { contains: "acme", mode: "insensitive" } },

@@ -1,4 +1,3 @@
-import { WORKSPACE_ID } from "@crm/auth";
 import { type Db, type Prisma, Prisma as PrismaNamespace } from "@crm/db";
 import {
 	BadRequestException,
@@ -8,7 +7,11 @@ import {
 	Optional,
 } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentOrganizationId,
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import {
 	builderMessageWithAttachments,
 	isPreviewableImage,
@@ -63,7 +66,7 @@ export class ConversationsService {
 	private readonly logger = new Logger(ConversationsService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		@Optional() private readonly agent?: AgentTriggerService,
 	) {}
 
@@ -408,6 +411,7 @@ export class ConversationsService {
 		try {
 			const conversation = await this.db.agentConversation.create({
 				data: {
+					projectId: currentProjectId(),
 					kind: "BUILDER",
 					userId,
 					title: null,
@@ -415,6 +419,7 @@ export class ConversationsService {
 					lastMessageAt: now,
 					submissions: {
 						create: {
+							projectId: currentProjectId(),
 							submittedById: userId,
 							clientRequestId: input.clientRequestId,
 							commandType: input.commandType,
@@ -468,6 +473,7 @@ export class ConversationsService {
 			const submission = await this.db.$transaction(async (tx) => {
 				const created = await tx.agentConversationSubmission.create({
 					data: {
+						projectId: currentProjectId(),
 						conversationId: input.id,
 						submittedById: userId,
 						clientRequestId: input.clientRequestId,
@@ -593,6 +599,7 @@ export class ConversationsService {
 			const submission = await this.db.$transaction(async (tx) => {
 				const created = await tx.agentConversationSubmission.create({
 					data: {
+						projectId: currentProjectId(),
 						conversationId: input.id,
 						submittedById: userId,
 						clientRequestId: input.clientRequestId,
@@ -744,6 +751,7 @@ export class ConversationsService {
 		await this.db.agentConversationFeedback.upsert({
 			where: key,
 			create: {
+				projectId: currentProjectId(),
 				conversationId: input.id,
 				userId,
 				messageId: input.messageId,
@@ -827,6 +835,7 @@ export class ConversationsService {
 			try {
 				conversation = await this.db.agentConversation.create({
 					data: {
+						projectId: currentProjectId(),
 						sessionId: input.sessionId,
 						continuationToken: input.continuationToken ?? null,
 						streamIndex: input.streamIndex ?? 0,
@@ -966,6 +975,7 @@ export class ConversationsService {
 		attachments: BuilderConversationCreateInput["attachments"],
 	) {
 		return attachments.map((attachment, position) => ({
+			projectId: currentProjectId(),
 			name: attachment.name,
 			mediaType: attachment.type,
 			size: attachment.size,
@@ -1013,6 +1023,7 @@ export class ConversationsService {
 					name: attachment.name,
 					mediaType: attachment.type,
 					size: attachment.size,
+					projectId: currentProjectId(),
 					content: Buffer.from(attachment.contentBase64, "base64"),
 					position,
 				};
@@ -1025,6 +1036,7 @@ export class ConversationsService {
 				);
 			}
 			return {
+				projectId: currentProjectId(),
 				name: stored.name,
 				mediaType: stored.mediaType,
 				size: stored.size,
@@ -1037,7 +1049,10 @@ export class ConversationsService {
 	private async assertWorkspaceMember(userId: string): Promise<void> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: {
+					organizationId: currentOrganizationId(),
+					userId,
+				},
 			},
 			select: { id: true },
 		});

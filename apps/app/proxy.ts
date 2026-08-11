@@ -3,8 +3,10 @@ import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 import { isMarketing } from "@/lib/env";
 import {
+	type ActiveProject,
 	ONBOARDING_PATH,
 	RESEARCH_PATH,
+	readActiveProject,
 	readResearchGate,
 	readWorkspaceGate,
 } from "@/lib/onboarding";
@@ -33,11 +35,12 @@ export async function proxy(request: NextRequest) {
 
 	if (isUngated(pathname)) return NextResponse.next();
 
-	// Both answers, every time, and concurrently — so the gate costs one round
-	// trip rather than two, and neither answer can be stale.
-	const [workspace, research] = await Promise.all([
+	// All three answers, every time, and concurrently — so the gate costs one
+	// round trip rather than three, and none of them can be stale.
+	const [workspace, research, project] = await Promise.all([
 		readWorkspaceGate(request),
 		readResearchGate(request),
+		readActiveProject(request),
 	]);
 
 	if (workspace.gate === "required") return sendTo(ONBOARDING_PATH, request);
@@ -45,25 +48,43 @@ export async function proxy(request: NextRequest) {
 
 	const settled = workspace.gate === "settled" && research === "settled";
 
-	if (!settled || !workspace.slug) return NextResponse.next();
+	if (!settled || !project) return NextResponse.next();
 
-	return sendTo(appPath(pathname, workspace.slug), request);
+	return sendTo(appPath(pathname, project), request);
 }
 
-function appPath(pathname: string, slug: string): string {
+function appPath(pathname: string, project: ActiveProject): string {
+	const { organizationSlug, projectSlug } = project;
+
 	if (pathname === LANDING_PATH || isSetup(pathname)) {
-		return workspaceUrl(slug);
+		return workspaceUrl(organizationSlug, projectSlug);
 	}
 
 	if (SECTIONS.some((section) => isUnder(pathname, section))) {
-		return workspaceUrl(slug, pathname);
+		return workspaceUrl(organizationSlug, projectSlug, pathname);
 	}
 
-	const [first, ...rest] = pathname.slice(1).split("/");
+	const [first, second, ...rest] = pathname.slice(1).split("/");
 
-	if (first === slug) return pathname;
+	if (first === organizationSlug && second === projectSlug) return pathname;
 
-	return workspaceUrl(slug, rest.length ? `/${rest.join("/")}` : "/");
+	const tail = [second, ...rest].filter(Boolean);
+
+	if (first === organizationSlug) {
+		return workspaceUrl(
+			organizationSlug,
+			projectSlug,
+			tail.length ? `/${tail.join("/")}` : "/",
+		);
+	}
+
+	const all = [first, ...tail].filter(Boolean);
+
+	return workspaceUrl(
+		organizationSlug,
+		projectSlug,
+		all.length ? `/${all.join("/")}` : "/",
+	);
 }
 
 function isUnder(pathname: string, prefix: string): boolean {

@@ -1,7 +1,10 @@
 import type { Db, FieldEntity } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import { bridge } from "./bridge";
 
 const POKE_TIMEOUT_MS = 2_000;
@@ -10,7 +13,7 @@ const POKE_TIMEOUT_MS = 2_000;
 export class AgentTriggerService {
 	private readonly logger = new Logger(AgentTriggerService.name);
 
-	constructor(@InjectDatabase() private readonly db: Db) {}
+	constructor(@InjectProjectDatabase() private readonly db: Db) {}
 
 	async companyCreated(
 		companyId: string,
@@ -91,6 +94,7 @@ export class AgentTriggerService {
 
 			await this.db.agentTask.create({
 				data: {
+					projectId: currentProjectId(),
 					kind: "field-backfill",
 					reason: `${subject}: ${reason}`,
 					priority: PRIORITY.fieldBackfill,
@@ -168,6 +172,7 @@ export class AgentTriggerService {
 			if (fresh.length > 0) {
 				await this.db.agentTask.createMany({
 					data: fresh.map((id) => ({
+						projectId: currentProjectId(),
 						contactId: input.contactIds ? id : null,
 						companyId: input.companyIds ? id : null,
 						kind: input.kind,
@@ -224,6 +229,7 @@ export class AgentTriggerService {
 
 			await this.db.agentTask.create({
 				data: {
+					projectId: currentProjectId(),
 					contactId: task.contactId ?? null,
 					companyId: task.companyId ?? null,
 					kind: task.kind,

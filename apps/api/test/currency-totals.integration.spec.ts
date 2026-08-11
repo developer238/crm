@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { DealStage, db, RateSource } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
-import { SETTINGS_ID, writeReportingCurrency } from "@crm/db/settings";
+import { writeReportingCurrency } from "@crm/db/settings";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DashboardService } from "../src/dashboard/dashboard.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "currency-totals-spec";
 const userId = `user-${suffix}`;
@@ -61,14 +62,20 @@ async function pipelineCents(): Promise<number> {
 	return summary.pipeline.totalCents;
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
+
 	const existing = await db.appSetting.findUnique({
-		where: { id: SETTINGS_ID },
+		where: { projectId },
 		select: { reportingCurrency: true },
 	});
 	previousReportingCurrency = existing?.reportingCurrency ?? null;
 
-	await writeReportingCurrency(db, "USD");
+	await writeReportingCurrency(db, projectId, "USD");
 	await clearRates();
 
 	await db.user.upsert({
@@ -83,8 +90,8 @@ beforeAll(async () => {
 	});
 
 	const company = await db.company.upsert({
-		where: { domain },
-		create: { name: `Money Co ${suffix}`, domain },
+		where: { projectId_domain: { projectId, domain } },
+		create: { projectId, name: `Money Co ${suffix}`, domain },
 		update: {},
 		select: { id: true },
 	});
@@ -100,7 +107,7 @@ afterAll(async () => {
 	await clearRates();
 
 	if (previousReportingCurrency) {
-		await writeReportingCurrency(db, previousReportingCurrency);
+		await writeReportingCurrency(db, projectId, previousReportingCurrency);
 	} else {
 		await db.appSetting.updateMany({ data: { reportingCurrency: null } });
 	}
@@ -202,7 +209,7 @@ describe("a total across currencies", () => {
 	});
 
 	it("re-rates everything when the reporting currency changes", async () => {
-		await writeReportingCurrency(db, "EUR");
+		await writeReportingCurrency(db, projectId, "EUR");
 
 		const rerated = await conversion.rerateAll();
 		expect(rerated.missing).toContain("USD");
@@ -217,7 +224,7 @@ describe("a total across currencies", () => {
 
 describe("the deals list", () => {
 	it("reports its open pipeline in the reporting currency and discloses the rest", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, projectId, "USD");
 		await conversion.rerateAll();
 
 		const list = await deals.list({
@@ -245,7 +252,7 @@ describe("the deals list", () => {
 
 describe("a converted figure knows which currency it is in", () => {
 	it("leaves a deal whose baseAmount predates a currency change out of totals", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, projectId, "USD");
 		await conversion.rerateAll();
 
 		const before = await pipelineCents();
@@ -281,13 +288,14 @@ describe("a converted figure knows which currency it is in", () => {
 	});
 
 	it("never lets a converted figure with no currency on it go unnoticed", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, projectId, "USD");
 		await conversion.rerateAll();
 
 		const before = await pipelineCents();
 
 		const orphan = await db.deal.create({
 			data: {
+				projectId,
 				name: `Orphan ${suffix}`,
 				companyId,
 				ownerId: userId,
@@ -322,6 +330,7 @@ describe("a converted figure knows which currency it is in", () => {
 			[" usd ", "Usd"].map((currency, index) =>
 				db.deal.create({
 					data: {
+						projectId,
 						name: `Variant ${index} ${suffix}`,
 						companyId,
 						ownerId: userId,
@@ -370,7 +379,7 @@ describe("a converted figure knows which currency it is in", () => {
 	});
 
 	it("keeps a converted deal when the rate behind it has gone away", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, projectId, "USD");
 		await conversion.rerateAll();
 
 		const deal = await deals.create({
@@ -393,6 +402,7 @@ describe("a converted figure knows which currency it is in", () => {
 
 		const stranded = await db.deal.create({
 			data: {
+				projectId,
 				name: `Stranded ${suffix}`,
 				companyId,
 				ownerId: userId,
@@ -425,7 +435,7 @@ describe("the dashboard only values what it can convert", () => {
 	const analystId = `analyst-${suffix}`;
 
 	beforeAll(async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, projectId, "USD");
 
 		await db.user.upsert({
 			where: { id: analystId },
@@ -449,6 +459,7 @@ describe("the dashboard only values what it can convert", () => {
 
 		return db.deal.create({
 			data: {
+				projectId,
 				name: `${name} ${suffix}`,
 				companyId,
 				ownerId: analystId,

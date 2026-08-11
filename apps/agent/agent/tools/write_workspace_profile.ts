@@ -1,12 +1,9 @@
 import { db } from "@crm/db";
-import {
-	MAX_LINE,
-	MAX_NARRATIVE,
-	writeWorkspaceProfile,
-} from "@crm/db/workspace";
+import { MAX_LINE, MAX_NARRATIVE, writeProjectProfile } from "@crm/db/project";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { currentFocus } from "../lib/focus";
+import { currentFocus, currentProjectId } from "../lib/focus";
+import { projectDb } from "../lib/project-db";
 import { assertResearchPurpose } from "../lib/session-purpose";
 import { identity } from "../lib/workspace";
 
@@ -38,7 +35,8 @@ export default defineTool({
 	}),
 	async execute(input, ctx) {
 		assertResearchPurpose(ctx);
-		const us = await identity();
+		const projectId = currentProjectId();
+		const us = await identity(projectId);
 
 		if (!us?.website) {
 			return {
@@ -58,7 +56,7 @@ export default defineTool({
 			};
 		}
 
-		const profile = await writeWorkspaceProfile(db, {
+		const profile = await writeProjectProfile(projectDb(), projectId, {
 			website: us.website,
 			narrative,
 			sections: {

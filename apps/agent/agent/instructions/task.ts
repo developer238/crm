@@ -38,7 +38,11 @@ export default defineDynamic({
 				},
 			);
 
-			focusOn({ ...focus, sessionId: ctx.session.id });
+			focusOn({
+				...focus,
+				projectId: asString(attributes.projectId),
+				sessionId: ctx.session.id,
+			});
 
 			return defineInstructions({
 				markdown: `${RESEARCH_INSTRUCTIONS}\n\n${markdown}`,

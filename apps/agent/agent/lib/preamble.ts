@@ -1,7 +1,8 @@
 import { db } from "@crm/db";
-import { websiteUrl } from "@crm/db/workspace";
+import { websiteUrl } from "@crm/db/project";
 import { capabilitiesMarkdown } from "./capabilities";
-import { identity, usMarkdown, type WorkspaceIdentity } from "./workspace";
+import { currentProjectId } from "./focus";
+import { identity, type ProjectIdentity, usMarkdown } from "./workspace";
 
 export type Opened = {
 	dispatched: boolean;
@@ -31,7 +32,7 @@ export async function sessionPreamble(
 }
 
 export async function composeClosing(
-	us: WorkspaceIdentity | null,
+	us: ProjectIdentity | null,
 ): Promise<string> {
 	return [usMarkdown(us), await capabilitiesMarkdown()]
 		.filter(Boolean)
@@ -39,7 +40,7 @@ export async function composeClosing(
 }
 
 async function closing(): Promise<string> {
-	return composeClosing(await identity());
+	return composeClosing(await identity(currentProjectId()));
 }
 
 function opening(opened: Opened, questions: string): string {
@@ -318,9 +319,9 @@ export async function noRecordPreamble(): Promise<Preamble> {
 }
 
 export async function workspacePreamble(
-	known?: WorkspaceIdentity | null,
+	known?: ProjectIdentity | null,
 ): Promise<Preamble> {
-	const us = known === undefined ? await identity() : known;
+	const us = known === undefined ? await identity(currentProjectId()) : known;
 	const site = websiteUrl(us?.website);
 
 	if (!us || !site) {

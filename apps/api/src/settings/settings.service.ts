@@ -10,7 +10,10 @@ import {
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ResearchKeyService } from "../agent/research-key.service";
 import { BackfillService } from "../backfill/backfill.service";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import {
 	type CatalogModel,
 	ModelCatalogService,
@@ -39,7 +42,7 @@ export class SettingsService {
 	private readonly logger = new Logger(SettingsService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly catalog: ModelCatalogService,
 		private readonly researchKeys: ResearchKeyService,
 		private readonly backfill: BackfillService,
@@ -47,7 +50,7 @@ export class SettingsService {
 
 	async agentModel(): Promise<AgentModelSettings> {
 		const [model, row] = await Promise.all([
-			readAgentModel(this.db),
+			readAgentModel(this.db, currentProjectId()),
 			this.db.appSetting.findFirst({ select: { updatedAt: true } }),
 		]);
 
@@ -62,7 +65,7 @@ export class SettingsService {
 
 	async setAgentModel(modelId: string | null): Promise<AgentModelSettings> {
 		if (modelId === null) {
-			await writeAgentModel(this.db, null);
+			await writeAgentModel(this.db, currentProjectId(), null);
 			this.logger.log({ message: "Agent model reset to the default" });
 			return this.agentModel();
 		}
@@ -83,7 +86,7 @@ export class SettingsService {
 			);
 		}
 
-		await writeAgentModel(this.db, {
+		await writeAgentModel(this.db, currentProjectId(), {
 			id: chosen.id,
 			contextWindowTokens: chosen.contextWindowTokens,
 		});
@@ -99,7 +102,7 @@ export class SettingsService {
 	}
 
 	async researchKey(): Promise<ResearchKeySettings> {
-		const key = await readContextDevKey(this.db);
+		const key = await readContextDevKey(this.db, currentProjectId());
 
 		return { configured: key !== null, hint: key ? maskKey(key) : null };
 	}
@@ -111,7 +114,7 @@ export class SettingsService {
 			throw new BadRequestException(check.reason);
 		}
 
-		await writeContextDevKey(this.db, apiKey);
+		await writeContextDevKey(this.db, currentProjectId(), apiKey);
 
 		this.logger.log({
 			message: "Context key saved",

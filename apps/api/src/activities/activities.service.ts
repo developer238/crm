@@ -7,7 +7,10 @@ import {
 } from "@nestjs/common";
 import { ActivityStampService } from "../crm/activity-stamp.service";
 import { blankToNull } from "../crm/values";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import type {
 	ActivityCreateInput,
 	MyTasksInput,
@@ -69,7 +72,7 @@ export class ActivitiesService {
 	private readonly logger = new Logger(ActivitiesService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly stamp: ActivityStampService,
 	) {}
 
@@ -129,6 +132,7 @@ export class ActivitiesService {
 
 		const activity = await this.db.activity.create({
 			data: {
+				projectId: currentProjectId(),
 				type: input.type,
 				subject: blankToNull(input.subject ?? ""),
 				body: blankToNull(input.body ?? ""),

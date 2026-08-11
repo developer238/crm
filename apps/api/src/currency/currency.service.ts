@@ -1,7 +1,6 @@
 import {
 	canManageCurrency,
 	isWorkspaceRole,
-	WORKSPACE_ID,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db } from "@crm/db";
@@ -20,6 +19,10 @@ import {
 	Logger,
 } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
+import {
+	currentOrganizationId,
+	currentProjectId,
+} from "../projects/project-context";
 import { ConversionService, type Unconverted } from "./conversion.service";
 import { RatesService } from "./rates.service";
 
@@ -140,7 +143,10 @@ export class CurrencyService {
 	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: {
+					organizationId: currentOrganizationId(),
+					userId,
+				},
 			},
 			select: { role: true },
 		});
@@ -169,7 +175,7 @@ export class CurrencyService {
 
 		if (currency === current) return this.settings(actingUserId);
 
-		await writeReportingCurrency(this.db, currency);
+		await writeReportingCurrency(this.db, currentProjectId(), currency);
 
 		const refresh = await this.rates.refresh();
 		const rerated = await this.conversion.rerateAll();

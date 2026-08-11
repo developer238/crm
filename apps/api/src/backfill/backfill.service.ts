@@ -1,13 +1,14 @@
 import { onSignedIn } from "@crm/auth";
 import { type Db, EnrichmentStatus, type Prisma } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
-import { readWorkspaceIdentity } from "@crm/db/workspace";
+import { readProjectIdentity } from "@crm/db/project";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import type { Cache } from "cache-manager";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { FaviconService } from "../companies/favicon.service";
 import { InjectDatabase } from "../database/database.constants";
+import { requireProjectContext } from "../projects/project-context";
 import { ImageMirrorService } from "./image-mirror.service";
 
 export type BackfillScope = "companies" | "contacts" | "deals";
@@ -94,7 +95,10 @@ export class BackfillService implements OnModuleInit {
 	}
 
 	private async sweepWorkspace(): Promise<void> {
-		const us = await readWorkspaceIdentity(this.db);
+		const us = await readProjectIdentity(
+			this.db,
+			requireProjectContext().projectId,
+		);
 
 		if (!us?.website || us.profile) return;
 

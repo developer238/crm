@@ -1,4 +1,4 @@
-import { DEFAULT_WORKSPACE_NAME } from "@crm/auth";
+import { DEFAULT_ORGANIZATION_NAME } from "@crm/auth";
 import type { Metadata } from "next";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
 import { requireMailboxAccess } from "@/lib/session";
@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
 				description="Two things, once. The name is what the CRM calls you; the website is how the agent learns what you sell."
 			/>
 
-			<OnboardingForm placeholder={DEFAULT_WORKSPACE_NAME} />
+			<OnboardingForm placeholder={DEFAULT_ORGANIZATION_NAME} />
 		</AuthShell>
 	);
 }

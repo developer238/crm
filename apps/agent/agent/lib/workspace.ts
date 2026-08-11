@@ -1,21 +1,20 @@
 import { db } from "@crm/db";
-import {
-	readWorkspaceIdentity,
-	type WorkspaceIdentity,
-} from "@crm/db/workspace";
+import { type ProjectIdentity, readProjectIdentity } from "@crm/db/project";
 
-export type { WorkspaceIdentity };
+export type { ProjectIdentity };
 
-export async function identity(): Promise<WorkspaceIdentity | null> {
+export async function identity(
+	projectId: string,
+): Promise<ProjectIdentity | null> {
 	try {
-		return await readWorkspaceIdentity(db);
+		return await readProjectIdentity(db, projectId);
 	} catch (error) {
 		console.error("[agent] could not read who we are", error);
 		return null;
 	}
 }
 
-export function usMarkdown(us: WorkspaceIdentity | null): string {
+export function usMarkdown(us: ProjectIdentity | null): string {
 	if (!us) return "";
 
 	const lines = ["## Who we are", ""];

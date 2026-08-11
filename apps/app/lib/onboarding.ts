@@ -57,6 +57,23 @@ export async function readWorkspaceGate(
 	};
 }
 
+export type ActiveProject = { organizationSlug: string; projectSlug: string };
+
+export async function readActiveProject(
+	request: NextRequest,
+): Promise<ActiveProject | null> {
+	const current = await read<{
+		active?: { slug?: string; organizationSlug?: string };
+	}>(request, "projects.current");
+
+	const projectSlug = current?.active?.slug;
+	const organizationSlug = current?.active?.organizationSlug;
+
+	if (!projectSlug || !organizationSlug) return null;
+
+	return { organizationSlug, projectSlug };
+}
+
 export async function readResearchGate(request: NextRequest): Promise<Gate> {
 	const key = await read<{ configured?: boolean }>(
 		request,

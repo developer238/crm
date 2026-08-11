@@ -1,8 +1,10 @@
 import { db, Prisma } from "@crm/db";
 import { MAX_ATTEMPTS, RETIRED_OUTCOME } from "@crm/db/agent-tasks";
+import { currentProjectId } from "./focus";
 
 export type LeasedTask = {
 	id: string;
+	projectId: string;
 	contactId: string | null;
 	companyId: string | null;
 	kind: string;
@@ -54,7 +56,7 @@ export async function claimDue(
 			FOR UPDATE SKIP LOCKED
 		) AS due
 		WHERE t.id = due.id
-		RETURNING t.id, t."contactId", t."companyId", t.kind, t.reason,
+		RETURNING t.id, t."projectId", t."contactId", t."companyId", t.kind, t.reason,
 			t.budget, t.attempts, t.priority, t."dueAt";
 	`;
 
@@ -145,6 +147,7 @@ export async function scheduleTask(input: {
 
 	return db.agentTask.create({
 		data: {
+			projectId: currentProjectId(),
 			contactId: input.contactId ?? null,
 			companyId: input.companyId ?? null,
 			kind: input.kind,

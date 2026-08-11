@@ -9,6 +9,7 @@ import {
 	type IncomingMessage,
 	ThreadWriterService,
 } from "../src/mailbox/thread-writer.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "thread-writer-spec";
 const domain = `threads-${suffix}.test`;
@@ -57,22 +58,34 @@ async function clean() {
 	await db.user.deleteMany({ where: { id: userId } });
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
+
 	await clean();
 
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: mailbox },
 	});
 	row = await db.mailboxSync.create({
-		data: { userId, source: "gmail", autoCreate: false },
+		data: {
+			organizationId: fixture.organizationId,
+			userId,
+			source: "gmail",
+			autoCreate: false,
+		},
 	});
 
 	const company = await db.company.create({
-		data: { name: "Buyer Co", domain },
+		data: { projectId, name: "Buyer Co", domain },
 		select: { id: true },
 	});
 	await db.contact.create({
 		data: {
+			projectId,
 			firstName: "A",
 			lastName: "Buyer",
 			email: person,
@@ -95,7 +108,9 @@ describe("storing a synced email", () => {
 		expect(stored).toBe(true);
 
 		const thread = await db.emailThread.findUnique({
-			where: { rootMessageId: rootId },
+			where: {
+				projectId_rootMessageId: { projectId, rootMessageId: rootId },
+			},
 			select: {
 				id: true,
 				messageCount: true,
@@ -109,7 +124,9 @@ describe("storing a synced email", () => {
 
 	it("repairs a thread whose projection was lost rather than skipping it forever", async () => {
 		const thread = await db.emailThread.findUnique({
-			where: { rootMessageId: rootId },
+			where: {
+				projectId_rootMessageId: { projectId, rootMessageId: rootId },
+			},
 			select: { id: true },
 		});
 		if (!thread) throw new Error("the first message was not stored");
@@ -158,7 +175,9 @@ describe("storing a synced email", () => {
 		).toBe(1);
 
 		const thread = await db.emailThread.findUnique({
-			where: { rootMessageId: rootId },
+			where: {
+				projectId_rootMessageId: { projectId, rootMessageId: rootId },
+			},
 			select: { messageCount: true, activity: { select: { id: true } } },
 		});
 
@@ -168,7 +187,9 @@ describe("storing a synced email", () => {
 
 	it("repairs the thread the message is already on when the root id has moved", async () => {
 		const thread = await db.emailThread.findUnique({
-			where: { rootMessageId: rootId },
+			where: {
+				projectId_rootMessageId: { projectId, rootMessageId: rootId },
+			},
 			select: { id: true },
 		});
 		if (!thread) throw new Error("the first message was not stored");
@@ -192,7 +213,9 @@ describe("storing a synced email", () => {
 
 		expect(stored).toBe(false);
 		expect(
-			await db.emailThread.count({ where: { rootMessageId: movedRoot } }),
+			await db.emailThread.count({
+				where: { projectId, rootMessageId: movedRoot },
+			}),
 		).toBe(0);
 
 		const repaired = await db.emailThread.findUnique({

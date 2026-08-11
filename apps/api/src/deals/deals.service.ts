@@ -30,8 +30,11 @@ import {
 	toCents,
 } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
-import { InjectDatabase } from "../database/database.constants";
 import { FieldsService } from "../fields/fields.service";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import {
 	countsByKey,
 	FACET_ALL,
@@ -101,7 +104,7 @@ export class DealsService {
 	private readonly logger = new Logger(DealsService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly stamp: ActivityStampService,
 		private readonly conversion: ConversionService,
 		private readonly fields: FieldsService,
@@ -248,6 +251,7 @@ export class DealsService {
 		try {
 			const deal = await this.db.deal.create({
 				data: {
+					projectId: currentProjectId(),
 					name: input.name.trim(),
 					companyId: input.companyId,
 					ownerId: input.ownerId,
@@ -399,6 +403,7 @@ export class DealsService {
 			}),
 			this.db.activity.create({
 				data: {
+					projectId: currentProjectId(),
 					type: ActivityType.STAGE_CHANGE,
 					subject: "Stage changed",
 					body: closedReason ?? null,
@@ -473,7 +478,12 @@ export class DealsService {
 					contactId: input.contactId,
 				},
 			},
-			create: { dealId: input.dealId, contactId: input.contactId, role },
+			create: {
+				projectId: currentProjectId(),
+				dealId: input.dealId,
+				contactId: input.contactId,
+				role,
+			},
 			update: role === null ? {} : { role },
 		});
 

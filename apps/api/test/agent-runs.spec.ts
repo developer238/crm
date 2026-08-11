@@ -1,10 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentRunsService } from "../src/agent/agent-runs.service";
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = crypto.randomUUID();
 const userId = `agent-run-user-${suffix}`;
@@ -20,17 +19,12 @@ const trigger = {
 } as AgentTriggerService;
 const service = new AgentRunsService(db, new AgentAccessService(db), trigger);
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: WORKSPACE_ID },
-		update: {},
-		create: {
-			id: WORKSPACE_ID,
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
 	await db.user.createMany({
 		data: [
 			{
@@ -48,19 +42,25 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: WORKSPACE_ID,
+			organizationId: fixture.organizationId,
 			userId,
 			role: "member",
 			createdAt: new Date(),
 		},
 	});
 	const agent = await db.agentDefinition.create({
-		data: { name: "Run safely", status: "LIVE", createdById: userId },
+		data: {
+			projectId,
+			name: "Run safely",
+			status: "LIVE",
+			createdById: userId,
+		},
 		select: { id: true },
 	});
 	agentId = agent.id;
 	const version = await db.agentVersion.create({
 		data: {
+			projectId,
 			agentId,
 			number: 1,
 			status: "DEPLOYED",
@@ -138,6 +138,7 @@ describe("manual agent runs", () => {
 		});
 		await db.agentRunEvent.create({
 			data: {
+				projectId,
 				runId,
 				sequence: 1,
 				type: "run.completed",
@@ -147,6 +148,7 @@ describe("manual agent runs", () => {
 		});
 		await db.agentAction.create({
 			data: {
+				projectId,
 				agentId,
 				runId,
 				type: "timeline.note.created",
@@ -208,6 +210,7 @@ describe("manual agent runs", () => {
 		const beforePokeCount = pokeCount;
 		const draft = await db.agentDefinition.create({
 			data: {
+				projectId,
 				name: "Draft run guard",
 				status: "DRAFT",
 				createdById: userId,
@@ -264,11 +267,17 @@ describe("manual agent runs", () => {
 
 	it("allows only one agent to claim a globally reused request id", async () => {
 		const otherAgent = await db.agentDefinition.create({
-			data: { name: "Other live agent", status: "LIVE", createdById: userId },
+			data: {
+				projectId,
+				name: "Other live agent",
+				status: "LIVE",
+				createdById: userId,
+			},
 			select: { id: true },
 		});
 		const otherVersion = await db.agentVersion.create({
 			data: {
+				projectId,
 				agentId: otherAgent.id,
 				number: 1,
 				status: "DEPLOYED",

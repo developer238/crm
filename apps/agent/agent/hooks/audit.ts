@@ -1,6 +1,6 @@
 import { db, type Prisma } from "@crm/db";
 import { defineHook } from "eve/hooks";
-import { currentFocus } from "../lib/focus";
+import { currentFocus, currentProjectId } from "../lib/focus";
 import { lockAgentRun } from "../lib/run-state";
 import { attribute, purposeOf } from "../lib/session-purpose";
 
@@ -20,6 +20,7 @@ export default defineHook({
 					await tx.agentEvent.createMany({
 						data: [
 							{
+								projectId: currentProjectId(),
 								id,
 								sessionId: ctx.session.id,
 								contactId: currentFocus().contactId,
@@ -122,6 +123,7 @@ async function persistRunEvent(
 
 	await tx.agentRunEvent.create({
 		data: {
+			projectId: currentProjectId(),
 			id: eventId,
 			runId,
 			sequence,

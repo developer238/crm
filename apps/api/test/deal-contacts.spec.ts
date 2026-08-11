@@ -4,6 +4,7 @@ import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "deal-contacts-spec";
 const userId = `user-${suffix}`;
@@ -34,7 +35,13 @@ async function clean() {
 	await db.user.deleteMany({ where: { id: userId } });
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
+
 	await clean();
 
 	await db.user.create({
@@ -47,30 +54,35 @@ beforeAll(async () => {
 	});
 
 	const company = await db.company.create({
-		data: { name: `People Co ${suffix}`, domain },
+		data: { projectId, name: `People Co ${suffix}`, domain },
 		select: { id: true },
 	});
 	companyId = company.id;
 
 	const other = await db.company.create({
-		data: { name: `Other Co ${suffix}`, domain: otherDomain },
+		data: { projectId, name: `Other Co ${suffix}`, domain: otherDomain },
 		select: { id: true },
 	});
 
 	const champion = await db.contact.create({
-		data: { firstName: "Ada", lastName: "Champion", companyId },
+		data: { projectId, firstName: "Ada", lastName: "Champion", companyId },
 		select: { id: true },
 	});
 	championId = champion.id;
 
 	const colleague = await db.contact.create({
-		data: { firstName: "Beau", lastName: "Colleague", companyId },
+		data: { projectId, firstName: "Beau", lastName: "Colleague", companyId },
 		select: { id: true },
 	});
 	colleagueId = colleague.id;
 
 	const outsider = await db.contact.create({
-		data: { firstName: "Cass", lastName: "Outsider", companyId: other.id },
+		data: {
+			projectId,
+			firstName: "Cass",
+			lastName: "Outsider",
+			companyId: other.id,
+		},
 		select: { id: true },
 	});
 	outsiderId = outsider.id;

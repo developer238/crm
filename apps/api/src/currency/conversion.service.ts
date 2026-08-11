@@ -10,6 +10,7 @@ import {
 import { readReportingCurrency } from "@crm/db/settings";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
+import { currentProjectId } from "../projects/project-context";
 
 export interface DealFxFields {
 	baseAmount: PrismaTypes.Decimal | null;
@@ -36,7 +37,7 @@ export class ConversionService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
 	async reportingCurrency(): Promise<string> {
-		return readReportingCurrency(this.db);
+		return readReportingCurrency(this.db, currentProjectId());
 	}
 
 	async rateFor(currency: string): Promise<ResolvedRate | null> {

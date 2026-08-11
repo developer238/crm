@@ -5,6 +5,7 @@ import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { CompanyDirectoryService } from "../companies/company-directory.service";
 import { EnrichmentLogService } from "../crm/enrichment-log.service";
 import { InjectDatabase } from "../database/database.constants";
+import { currentProjectId } from "../projects/project-context";
 import {
 	dominantDomain,
 	externalParticipants,
@@ -214,13 +215,24 @@ export class MailboxMatchService {
 		const { firstName, lastName } = splitName(person.name, person.email);
 
 		const existing = await this.db.contact.findUnique({
-			where: { email: person.email },
+			where: {
+				projectId_email: {
+					projectId: currentProjectId(),
+					email: person.email,
+				},
+			},
 			select: { id: true },
 		});
 
 		const contact = await this.db.contact.upsert({
-			where: { email: person.email },
+			where: {
+				projectId_email: {
+					projectId: currentProjectId(),
+					email: person.email,
+				},
+			},
 			create: {
+				projectId: currentProjectId(),
 				firstName,
 				lastName,
 				email: person.email,

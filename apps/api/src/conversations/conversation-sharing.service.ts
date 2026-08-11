@@ -1,18 +1,21 @@
 import { randomBytes } from "node:crypto";
-import { WORKSPACE_ID } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
 import {
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentOrganizationId,
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import { builderMessageWithAttachments } from "./conversation-attachments";
 import { conversationShareTokenHash } from "./conversation-share-token";
 
 @Injectable()
 export class ConversationSharingService {
-	constructor(@InjectDatabase() private readonly db: Db) {}
+	constructor(@InjectProjectDatabase() private readonly db: Db) {}
 
 	async status(conversationId: string, userId: string) {
 		await this.ownedBuilder(conversationId, userId);
@@ -48,7 +51,12 @@ export class ConversationSharingService {
 			});
 
 			await tx.agentConversationShare.create({
-				data: { conversationId, createdById: userId, tokenHash },
+				data: {
+					projectId: currentProjectId(),
+					conversationId,
+					createdById: userId,
+					tokenHash,
+				},
 			});
 
 			return true;
@@ -220,7 +228,10 @@ export class ConversationSharingService {
 	private async assertWorkspaceMember(userId: string): Promise<void> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: {
+					organizationId: currentOrganizationId(),
+					userId,
+				},
 			},
 			select: { id: true },
 		});

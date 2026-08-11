@@ -6,7 +6,7 @@ import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
-import { ensureWorkspaceMembership } from "./organization";
+import { ensureOrganizationMembership } from "./organization";
 import {
 	GOOGLE_PROVIDER_ID,
 	MICROSOFT_PROVIDER_ID,
@@ -153,10 +153,12 @@ export const auth = betterAuth({
 		session: {
 			create: {
 				before: async (session) => {
-					const workspaceId = await ensureWorkspaceMembership(session.userId);
+					const organizationId = await ensureOrganizationMembership(
+						session.userId,
+					);
 
 					return {
-						data: { ...session, activeOrganizationId: workspaceId ?? null },
+						data: { ...session, activeOrganizationId: organizationId ?? null },
 					};
 				},
 

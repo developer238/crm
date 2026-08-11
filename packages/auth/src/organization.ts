@@ -1,9 +1,11 @@
 import { db } from "@crm/db";
-import { WORKSPACE_ID, workspaceSlug } from "@crm/db/workspace";
+import {
+	DEFAULT_PROJECT_NAME,
+	projectSlug,
+	RESERVED_SLUGS,
+} from "@crm/db/project";
 
-export { WORKSPACE_ID };
-
-export const DEFAULT_WORKSPACE_NAME = "CRM";
+export const DEFAULT_ORGANIZATION_NAME = "CRM";
 
 export const WORKSPACE_ROLES = ["owner", "admin", "member"] as const;
 
@@ -29,75 +31,89 @@ export function canManageCurrency(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
-export async function ensureWorkspaceMembership(
+export function canManageProjects(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
+
+export function organizationSlug(name: string): string {
+	const base = name
+		.normalize("NFKD")
+		.replace(/\p{M}/gu, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.slice(0, 48)
+		.replace(/^-+|-+$/g, "");
+
+	if (!base) return "org";
+
+	return RESERVED_SLUGS.includes(base) ? `${base}-crm` : base;
+}
+
+export async function ensureOrganizationMembership(
 	userId: string,
 ): Promise<string | undefined> {
 	try {
 		return await db.$transaction(async (tx) => {
-			const workspace = await tx.organization.upsert({
-				where: { id: WORKSPACE_ID },
-				create: {
-					id: WORKSPACE_ID,
-					name: DEFAULT_WORKSPACE_NAME,
-					slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-					createdAt: new Date(),
-				},
-				update: {},
-				select: { id: true, name: true, slug: true },
+			const existing = await tx.member.findFirst({
+				where: { userId },
+				orderBy: { createdAt: "asc" },
+				select: { organizationId: true },
 			});
 
-			const slug = workspaceSlug(workspace.name);
+			if (existing) return existing.organizationId;
 
-			if (workspace.slug !== slug) {
-				await tx.organization.update({
-					where: { id: workspace.id },
-					data: { slug },
-				});
-			}
-
-			const enrolled = await tx.member.count({
-				where: { organizationId: workspace.id },
+			const anyOrganization = await tx.organization.findFirst({
+				orderBy: { createdAt: "asc" },
+				select: { id: true },
 			});
 
-			if (enrolled === 0) {
-				const existing = await tx.user.findMany({
-					select: { id: true },
-					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-				});
+			const organizationId = anyOrganization
+				? anyOrganization.id
+				: await createOrganization(tx);
 
-				await tx.member.createMany({
-					data: existing.map((user, index) => ({
-						id: crypto.randomUUID(),
-						organizationId: workspace.id,
-						userId: user.id,
-						role: index === 0 ? "owner" : "member",
-						createdAt: new Date(),
-					})),
-					skipDuplicates: true,
-				});
-			}
+			const enrolled = await tx.member.count({ where: { organizationId } });
 
-			await tx.member.upsert({
-				where: {
-					organizationId_userId: { organizationId: workspace.id, userId },
-				},
-				create: {
+			await tx.member.create({
+				data: {
 					id: crypto.randomUUID(),
-					organizationId: workspace.id,
+					organizationId,
 					userId,
-					role: "member",
+					role: enrolled === 0 ? "owner" : "member",
 					createdAt: new Date(),
 				},
-				update: {},
 			});
 
-			return workspace.id;
+			return organizationId;
 		});
 	} catch (error) {
 		console.error(
-			`[auth] could not enrol user ${userId} in workspace ${WORKSPACE_ID}; the next sign-in will retry`,
+			`[auth] could not enrol user ${userId} in an organization; the next sign-in will retry`,
 			error,
 		);
 		return undefined;
 	}
+}
+
+type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+async function createOrganization(tx: Tx): Promise<string> {
+	const organization = await tx.organization.create({
+		data: {
+			id: crypto.randomUUID(),
+			name: DEFAULT_ORGANIZATION_NAME,
+			slug: organizationSlug(DEFAULT_ORGANIZATION_NAME),
+			createdAt: new Date(),
+		},
+		select: { id: true },
+	});
+
+	await tx.project.create({
+		data: {
+			organizationId: organization.id,
+			name: DEFAULT_PROJECT_NAME,
+			slug: projectSlug(DEFAULT_PROJECT_NAME),
+		},
+	});
+
+	return organization.id;
 }

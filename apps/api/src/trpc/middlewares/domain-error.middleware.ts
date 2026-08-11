@@ -5,6 +5,7 @@ import type {
 	MiddlewareResponse,
 	TRPCMiddleware,
 } from "nestjs-trpc";
+import { NoProjectInScopeError } from "../../projects/project-context";
 
 type TrpcErrorCode =
 	| "BAD_REQUEST"
@@ -45,6 +46,14 @@ export class DomainErrorMiddleware implements TRPCMiddleware {
 
 		const failure = result as { error?: unknown };
 		const cause = (failure.error as { cause?: unknown } | undefined)?.cause;
+
+		if (cause instanceof NoProjectInScopeError) {
+			throw new TRPCError({
+				code: "FORBIDDEN",
+				message:
+					"No project is in scope for this request. Pick a project and try again.",
+			});
+		}
 
 		if (cause instanceof HttpException) {
 			throw new TRPCError({

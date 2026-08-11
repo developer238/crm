@@ -6,7 +6,10 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import { AgentAccessService } from "./agent-access.service";
 import { AgentTriggerService } from "./agent-trigger.service";
 import type { AgentRunNowInput } from "./agents.contracts";
@@ -14,7 +17,7 @@ import type { AgentRunNowInput } from "./agents.contracts";
 @Injectable()
 export class AgentRunsService {
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly access: AgentAccessService,
 		private readonly trigger: AgentTriggerService,
 	) {}
@@ -169,6 +172,7 @@ export class AgentRunsService {
 
 			const created = await tx.agentRun.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: input.id,
 					versionId: agent.currentVersionId,
 					initiatedById: userId,
@@ -176,7 +180,12 @@ export class AgentRunsService {
 					idempotencyKey: input.clientRequestId,
 					correlationId: randomUUID(),
 					events: {
-						create: { sequence: 0, type: "run.queued", data: {} },
+						create: {
+							projectId: currentProjectId(),
+							sequence: 0,
+							type: "run.queued",
+							data: {},
+						},
 					},
 				},
 				select: { id: true },
@@ -184,6 +193,7 @@ export class AgentRunsService {
 
 			await tx.agentAuditEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: input.id,
 					versionId: agent.currentVersionId,
 					actorUserId: userId,

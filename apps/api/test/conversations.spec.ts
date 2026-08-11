@@ -1,13 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import {
 	builderConversationCreateInput,
 	conversationListInput,
 	conversationSaveInput,
 } from "../src/conversations/conversations.contracts";
 import { ConversationsService } from "../src/conversations/conversations.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "conversations-spec";
 const email = `conversation.subject.${suffix}@example.test`;
@@ -16,6 +15,9 @@ const memberId = `conversation-member-${suffix}`;
 
 let contactId: string;
 let service: ConversationsService;
+
+let fixture: TestProject;
+let projectId = "";
 
 beforeAll(async () => {
 	await db.agentEvent.deleteMany({
@@ -30,16 +32,8 @@ beforeAll(async () => {
 	await db.member.deleteMany({ where: { id: memberId } });
 	await db.user.deleteMany({ where: { id: userId } });
 	await db.contact.deleteMany({ where: { email } });
-	await db.organization.upsert({
-		where: { id: WORKSPACE_ID },
-		update: {},
-		create: {
-			id: WORKSPACE_ID,
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
 
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
@@ -47,14 +41,14 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: WORKSPACE_ID,
+			organizationId: fixture.organizationId,
 			userId,
 			role: "member",
 			createdAt: new Date(),
 		},
 	});
 	const contact = await db.contact.create({
-		data: { firstName: "Conversation", lastName: "Subject", email },
+		data: { projectId, firstName: "Conversation", lastName: "Subject", email },
 		select: { id: true },
 	});
 	contactId = contact.id;
@@ -269,6 +263,7 @@ describe("ConversationsService", () => {
 		const emittedAt = new Date("2026-08-05T12:00:00.000Z");
 		await db.agentEvent.createMany({
 			data: [0, 1, 2, 3].map((position) => ({
+				projectId,
 				id: `evt_${suffix}_window_${position}`,
 				sessionId,
 				contactId,
@@ -291,6 +286,7 @@ describe("ConversationsService", () => {
 
 		await db.agentEvent.create({
 			data: {
+				projectId,
 				id: `evt_${suffix}`,
 				sessionId,
 				contactId,
@@ -301,6 +297,7 @@ describe("ConversationsService", () => {
 		});
 		await db.agentBuilderArtifact.create({
 			data: {
+				projectId,
 				conversationId: conversation.id,
 				path: "agent/instructions.md",
 				language: "markdown",
@@ -646,6 +643,7 @@ describe("ConversationsService", () => {
 		});
 		await db.agentEvent.create({
 			data: {
+				projectId,
 				id: `evt_${suffix}_question`,
 				sessionId,
 				type: "input.requested",
@@ -718,6 +716,7 @@ describe("ConversationsService", () => {
 		});
 		await db.agentEvent.create({
 			data: {
+				projectId,
 				id: `evt_${suffix}_concurrent_question`,
 				sessionId,
 				type: "input.requested",

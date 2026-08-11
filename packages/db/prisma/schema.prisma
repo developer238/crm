@@ -219,9 +219,12 @@ enum AgentResponseRating {
 }
 
 model Company {
-  id          String  @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   name        String
-  domain      String? @unique
+  domain      String?
   website     String?
   description String?
 
@@ -271,27 +274,36 @@ model Company {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
-  @@index([ownerId])
-  @@index([name])
-  @@index([lastActivityAt])
+  @@unique([projectId, domain])
+  @@index([projectId, name])
+  @@index([projectId, lastActivityAt])
+  @@index([projectId, ownerId])
   @@map("company")
 }
 
 model CompanyEnrichment {
-  companyId String   @id
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String  @id
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   source    String   @default("context.dev")
   raw       Json
   fetchedAt DateTime @default(now())
 
+  @@index([projectId])
   @@map("companyEnrichment")
 }
 
 model Contact {
-  id          String  @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   firstName   String
   lastName    String?
-  email       String? @unique
+  email       String?
   phone       String?
   title       String?
   linkedinUrl String?
@@ -328,9 +340,10 @@ model Contact {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  @@index([companyId])
-  @@index([ownerId])
-  @@index([lastActivityAt])
+  @@unique([projectId, email])
+  @@index([projectId, companyId])
+  @@index([projectId, ownerId])
+  @@index([projectId, lastActivityAt])
   @@map("contact")
 }
 
@@ -351,6 +364,9 @@ model ContactFact {
   id        String  @id @default(cuid())
   contactId String
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   field String
   value String
@@ -374,13 +390,16 @@ model ContactFact {
   supersededAt DateTime?
 
   @@index([contactId, field, status])
-  @@index([status, observedAt])
+  @@index([projectId, status, observedAt])
   @@map("contactFact")
 }
 
 model ContactBrief {
   contactId String  @id
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   narrative String
   sections  Json
@@ -391,11 +410,15 @@ model ContactBrief {
 
   refreshedAt DateTime @default(now())
 
+  @@index([projectId])
   @@map("contactBrief")
 }
 
 model AgentTask {
   id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   contactId String?
   companyId String?
 
@@ -417,12 +440,16 @@ model AgentTask {
   createdAt DateTime @default(now())
 
   @@index([dueAt, leasedUntil])
-  @@index([contactId])
+  @@index([projectId, dueAt, leasedUntil])
+  @@index([projectId, contactId])
   @@map("agentTask")
 }
 
 model AgentEvent {
   id        String  @id
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   sessionId String
   contactId String?
   type      String
@@ -431,12 +458,14 @@ model AgentEvent {
   emittedAt DateTime
 
   @@index([sessionId, emittedAt])
-  @@index([contactId, emittedAt])
+  @@index([projectId, contactId, emittedAt])
   @@map("agentEvent")
 }
 
 model AgentConversation {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   kind AgentConversationKind @default(RECORD)
 
@@ -475,13 +504,15 @@ model AgentConversation {
   @@index([contactId, lastMessageAt])
   @@index([companyId, lastMessageAt])
   @@index([dealId, lastMessageAt])
-  @@index([userId, kind, lastMessageAt])
-  @@index([agentId, lastMessageAt])
+  @@index([projectId, userId, kind, lastMessageAt])
+  @@index([projectId, agentId, lastMessageAt])
   @@map("agentConversation")
 }
 
 model AgentConversationFeedback {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   conversationId String
   conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -501,7 +532,9 @@ model AgentConversationFeedback {
 }
 
 model AgentConversationShare {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   conversationId String
   conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -522,7 +555,9 @@ model AgentConversationShare {
 }
 
 model AgentConversationSubmission {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   conversationId String
   conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -548,12 +583,14 @@ model AgentConversationSubmission {
 
   @@unique([conversationId, inputRequestId])
   @@index([conversationId, createdAt])
-  @@index([status, createdAt])
+  @@index([projectId, status, createdAt])
   @@map("agentConversationSubmission")
 }
 
 model AgentConversationAttachment {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   submissionId String
   submission   AgentConversationSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -571,7 +608,9 @@ model AgentConversationAttachment {
 }
 
 model AgentDefinition {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
@@ -596,13 +635,15 @@ model AgentDefinition {
   deletedAt  DateTime?
 
   @@unique([currentVersionId, id])
-  @@index([status, updatedAt])
-  @@index([createdById, createdAt])
+  @@index([projectId, status, updatedAt])
+  @@index([projectId, createdById, createdAt])
   @@map("agentDefinition")
 }
 
 model AgentVersion {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   agentId String
   agent   AgentDefinition @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Restrict)
@@ -637,12 +678,14 @@ model AgentVersion {
   @@unique([agentId, number])
   @@unique([id, agentId])
   @@index([agentId, createdAt])
-  @@index([status, createdAt])
+  @@index([projectId, status, createdAt])
   @@map("agentVersion")
 }
 
 model AgentBuilderArtifact {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   conversationId String?
   conversation   AgentConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
@@ -661,12 +704,14 @@ model AgentBuilderArtifact {
   @@unique([conversationId, path, revision], map: "agentBuilderArtifact_conversation_path_revision_key", where: { conversationId: { not: null } })
   @@unique([versionId, path, revision], map: "agentBuilderArtifact_version_path_revision_key", where: { versionId: { not: null } })
   @@index([conversationId, createdAt])
-  @@index([versionId, path])
+  @@index([projectId, versionId, path])
   @@map("agentBuilderArtifact")
 }
 
 model AgentTrigger {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   agentId String
   agent   AgentDefinition @relation(fields: [agentId], references: [id], onDelete: Restrict)
@@ -692,12 +737,14 @@ model AgentTrigger {
   @@unique([id, agentId])
   @@index([agentId, enabled])
   @@index([enabled, nextRunAt])
-  @@index([versionId])
+  @@index([projectId, versionId])
   @@map("agentTrigger")
 }
 
 model AgentRun {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   agentId String
   agent   AgentDefinition @relation(fields: [agentId], references: [id], onDelete: Restrict)
@@ -742,13 +789,15 @@ model AgentRun {
   @@unique([id, agentId])
   @@index([agentId, createdAt])
   @@index([versionId, createdAt])
-  @@index([status, createdAt])
+  @@index([projectId, status, createdAt])
   @@index([triggerId, createdAt])
   @@map("agentRun")
 }
 
 model AgentRunEvent {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   runId String
   run   AgentRun @relation(fields: [runId], references: [id], onDelete: Restrict)
@@ -764,7 +813,9 @@ model AgentRunEvent {
 }
 
 model AgentAction {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   agentId String
   agent   AgentDefinition @relation(fields: [agentId], references: [id], onDelete: Restrict)
@@ -797,12 +848,14 @@ model AgentAction {
   @@index([agentId, plannedAt])
   @@index([runId, plannedAt])
   @@index([provider, externalId])
-  @@index([status, plannedAt])
+  @@index([projectId, status, plannedAt])
   @@map("agentAction")
 }
 
 model AgentAuditEvent {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   agentId String
   agent   AgentDefinition @relation(fields: [agentId], references: [id], onDelete: Restrict)
@@ -826,12 +879,15 @@ model AgentAuditEvent {
   @@index([agentId, emittedAt])
   @@index([versionId, emittedAt])
   @@index([actorUserId, emittedAt])
-  @@index([type, emittedAt])
+  @@index([projectId, type, emittedAt])
   @@map("agentAuditEvent")
 }
 
 model Deal {
-  id            String              @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   conversations AgentConversation[]
   name          String
   description   String?
@@ -862,12 +918,12 @@ model Deal {
   updatedAt   DateTime      @updatedAt
 
   @@index([companyId])
-  @@index([ownerId])
-  @@index([stage])
-  @@index([expectedCloseDate])
-  @@index([lastActivityAt])
-  @@index([baseAmount])
-  @@index([currency])
+  @@index([projectId, ownerId])
+  @@index([projectId, stage])
+  @@index([projectId, expectedCloseDate])
+  @@index([projectId, lastActivityAt])
+  @@index([projectId, baseAmount])
+  @@index([projectId, currency])
   @@map("deal")
 }
 
@@ -899,8 +955,12 @@ model DealContact {
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   role      String?
 
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   @@id([dealId, contactId])
   @@index([contactId])
+  @@index([projectId])
   @@map("dealContact")
 }
 
@@ -924,7 +984,10 @@ enum FieldType {
 }
 
 model FieldDefinition {
-  id     String      @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   entity FieldEntity
   key    String
   label  String
@@ -946,8 +1009,8 @@ model FieldDefinition {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([entity, key])
-  @@index([entity, position])
+  @@unique([projectId, entity, key])
+  @@index([projectId, entity, position])
   @@map("fieldDefinition")
 }
 
@@ -958,10 +1021,14 @@ model FieldOption {
   label    String
   position Int
 
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   archivedAt DateTime?
   values     FieldValue[]
 
   @@index([fieldId, position])
+  @@index([projectId])
   @@map("fieldOption")
 }
 
@@ -969,6 +1036,9 @@ model FieldValue {
   id      String          @id @default(cuid())
   fieldId String
   field   FieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -999,11 +1069,15 @@ model FieldValue {
   @@index([dealId])
   @@index([optionId])
   @@index([userId])
+  @@index([projectId])
   @@map("fieldValue")
 }
 
 model Activity {
-  id      String       @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   type    ActivityType
   subject String?
   body    String?
@@ -1034,8 +1108,8 @@ model Activity {
   @@index([companyId, createdAt])
   @@index([dealId, createdAt])
   @@index([contactId, createdAt])
-  @@index([dueAt])
-  @@index([createdById])
+  @@index([projectId, dueAt])
+  @@index([projectId, createdById])
   @@map("activity")
 }
 
@@ -1057,6 +1131,9 @@ model MailboxSync {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   source String
 
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   status       GoogleSyncStatus @default(IDLE)
   cursor       String?
   lastSyncedAt DateTime?
@@ -1069,12 +1146,16 @@ model MailboxSync {
 
   @@unique([userId, source])
   @@index([status])
+  @@index([organizationId])
   @@map("mailboxSync")
 }
 
 model EmailThread {
-  id            String  @id @default(cuid())
-  rootMessageId String  @unique
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  rootMessageId String
   subject       String?
 
   companyId String?
@@ -1092,6 +1173,7 @@ model EmailThread {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([projectId, rootMessageId])
   @@index([companyId, lastMessageAt])
   @@index([contactId, lastMessageAt])
   @@map("emailThread")
@@ -1102,7 +1184,10 @@ model EmailMessage {
   threadId String
   thread   EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
-  rfcMessageId     String  @unique
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  rfcMessageId     String
   syncedByUserId   String?
   gmailMessageId   String?
   outlookMessageId String?
@@ -1119,12 +1204,16 @@ model EmailMessage {
 
   createdAt DateTime @default(now())
 
+  @@unique([projectId, rfcMessageId])
   @@index([threadId, sentAt])
   @@map("emailMessage")
 }
 
 model CalendarEvent {
-  id                String   @id @default(cuid())
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   iCalUid           String
   originalStartTime DateTime
   recurringEventId  String?
@@ -1153,7 +1242,7 @@ model CalendarEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([iCalUid, originalStartTime])
+  @@unique([projectId, iCalUid, originalStartTime])
   @@index([companyId, startsAt])
   @@index([contactId, startsAt])
   @@map("calendarEvent")
@@ -1164,6 +1253,9 @@ model CalendarAttendee {
   eventId String
   event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   email          String
   name           String?
   responseStatus String?
@@ -1173,27 +1265,37 @@ model CalendarAttendee {
 
   @@unique([eventId, email])
   @@index([contactId])
+  @@index([projectId])
   @@map("calendarAttendee")
 }
 
 model SuppressedDomain {
-  domain    String   @id
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  domain    String
   reason    String?
   createdAt DateTime @default(now())
 
+  @@id([projectId, domain])
   @@map("suppressedDomain")
 }
 
 model SuppressedContact {
-  email     String   @id
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  email     String
   reason    String?
   createdAt DateTime @default(now())
 
+  @@id([projectId, email])
   @@map("suppressedContact")
 }
 
 model AppSetting {
-  id String @id
+  projectId String  @id
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   agentModelId String?
 
@@ -1249,13 +1351,76 @@ model Organization {
   website     String?
   members     Member[]
   invitations Invitation[]
+  projects    Project[]
+
+  mailboxSyncs MailboxSync[]
 
   @@unique([slug])
   @@map("organization")
 }
 
-model WorkspaceProfile {
-  id String @id
+model Project {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  slug     String
+  website  String?
+  metadata String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile  ProjectProfile?
+  settings AppSetting?
+
+  companies          Company[]
+  companyEnrichments CompanyEnrichment[]
+  contacts           Contact[]
+  contactFacts       ContactFact[]
+  contactBriefs      ContactBrief[]
+
+  agentTasks                   AgentTask[]
+  agentEvents                  AgentEvent[]
+  agentConversations           AgentConversation[]
+  agentConversationFeedback    AgentConversationFeedback[]
+  agentConversationShares      AgentConversationShare[]
+  agentConversationSubmissions AgentConversationSubmission[]
+  agentConversationAttachments AgentConversationAttachment[]
+  agentDefinitions             AgentDefinition[]
+  agentVersions                AgentVersion[]
+  agentBuilderArtifacts        AgentBuilderArtifact[]
+  agentTriggers                AgentTrigger[]
+  agentRuns                    AgentRun[]
+  agentRunEvents               AgentRunEvent[]
+  agentActions                 AgentAction[]
+  agentAuditEvents             AgentAuditEvent[]
+
+  deals        Deal[]
+  dealContacts DealContact[]
+
+  fieldDefinitions FieldDefinition[]
+  fieldOptions     FieldOption[]
+  fieldValues      FieldValue[]
+
+  activities        Activity[]
+  emailThreads      EmailThread[]
+  emailMessages     EmailMessage[]
+  calendarEvents    CalendarEvent[]
+  calendarAttendees CalendarAttendee[]
+
+  suppressedDomains  SuppressedDomain[]
+  suppressedContacts SuppressedContact[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("project")
+}
+
+model ProjectProfile {
+  projectId String  @id
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   website   String
   narrative String
@@ -1266,7 +1431,7 @@ model WorkspaceProfile {
 
   refreshedAt DateTime @default(now())
 
-  @@map("workspaceProfile")
+  @@map("projectProfile")
 }
 
 model Member {

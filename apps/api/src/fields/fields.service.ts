@@ -25,7 +25,10 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import type {
 	FieldCreateInput,
 	FieldReorderInput,
@@ -39,7 +42,7 @@ const WITH_OPTIONS = {
 @Injectable()
 export class FieldsService {
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly agent: AgentTriggerService,
 	) {}
 
@@ -58,7 +61,9 @@ export class FieldsService {
 
 	async byKey(entity: FieldEntity, key: string): Promise<SerializedField> {
 		const definition = await this.db.fieldDefinition.findUnique({
-			where: { entity_key: { entity, key } },
+			where: {
+				projectId_entity_key: { projectId: currentProjectId(), entity, key },
+			},
 			include: WITH_OPTIONS,
 		});
 
@@ -75,7 +80,13 @@ export class FieldsService {
 		}
 
 		const taken = await this.db.fieldDefinition.findUnique({
-			where: { entity_key: { entity: input.entity, key } },
+			where: {
+				projectId_entity_key: {
+					projectId: currentProjectId(),
+					entity: input.entity,
+					key,
+				},
+			},
 			select: { id: true },
 		});
 
@@ -95,6 +106,7 @@ export class FieldsService {
 
 		const definition = await this.db.fieldDefinition.create({
 			data: {
+				projectId: currentProjectId(),
 				entity: input.entity,
 				key,
 				label: input.label,
@@ -108,6 +120,7 @@ export class FieldsService {
 				options: usesOptions(input.type)
 					? {
 							create: input.options.map((option, index) => ({
+								projectId: currentProjectId(),
 								label: option.label,
 								position: index,
 							})),
@@ -181,7 +194,12 @@ export class FieldsService {
 					}
 
 					await tx.fieldOption.create({
-						data: { fieldId: id, label: option.label, position: index },
+						data: {
+							projectId: currentProjectId(),
+							fieldId: id,
+							label: option.label,
+							position: index,
+						},
 					});
 				}
 			}

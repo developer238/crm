@@ -22,8 +22,11 @@ import {
 } from "../crm/activity-stamp.service";
 import { type BulkResult, requireOwner, runBulk } from "../crm/bulk";
 import { blankToNull, normalizeEmail, toCents } from "../crm/values";
-import { InjectDatabase } from "../database/database.constants";
 import { FieldsService } from "../fields/fields.service";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import {
 	countsByKey,
 	FACET_ALL,
@@ -113,7 +116,7 @@ export class ContactsService {
 	private readonly logger = new Logger(ContactsService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly companies: CompanyDirectoryService,
 		private readonly agent: AgentTriggerService,
 		private readonly queue: AgentQueueService,
@@ -300,6 +303,7 @@ export class ContactsService {
 
 			return tx.contact.create({
 				data: {
+					projectId: currentProjectId(),
 					firstName: input.firstName.trim(),
 					lastName: blankToNull(input.lastName ?? ""),
 					email,
@@ -348,8 +352,14 @@ export class ContactsService {
 
 				if (suppress) {
 					await tx.suppressedContact.upsert({
-						where: { email: suppress },
+						where: {
+							projectId_email: {
+								projectId: currentProjectId(),
+								email: suppress,
+							},
+						},
 						create: {
+							projectId: currentProjectId(),
 							email: suppress,
 							reason: `Deleted from the CRM (${name})`,
 						},

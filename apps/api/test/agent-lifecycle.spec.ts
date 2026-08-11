@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentDefinitionsService } from "../src/agent/agent-definitions.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = crypto.randomUUID();
 const userId = `agent-lifecycle-user-${suffix}`;
@@ -13,17 +12,12 @@ const teammateMemberId = `agent-lifecycle-teammate-member-${suffix}`;
 const access = new AgentAccessService(db);
 const agents = new AgentDefinitionsService(db, access);
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: WORKSPACE_ID },
-		update: {},
-		create: {
-			id: WORKSPACE_ID,
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
 	await db.user.createMany({
 		data: [
 			{
@@ -42,14 +36,14 @@ beforeAll(async () => {
 		data: [
 			{
 				id: memberId,
-				organizationId: WORKSPACE_ID,
+				organizationId: fixture.organizationId,
 				userId,
 				role: "member",
 				createdAt: new Date(),
 			},
 			{
 				id: teammateMemberId,
-				organizationId: WORKSPACE_ID,
+				organizationId: fixture.organizationId,
 				userId: teammateId,
 				role: "member",
 				createdAt: new Date(),
@@ -104,6 +98,7 @@ afterAll(async () => {
 async function createAgent(versionCount = 1, status = "DRAFT" as const) {
 	const agent = await db.agentDefinition.create({
 		data: {
+			projectId,
 			name: `Lifecycle agent ${crypto.randomUUID()}`,
 			status,
 			createdById: userId,
@@ -115,6 +110,7 @@ async function createAgent(versionCount = 1, status = "DRAFT" as const) {
 		versions.push(
 			await db.agentVersion.create({
 				data: {
+					projectId,
 					agentId: agent.id,
 					number,
 					status: "READY",
@@ -180,6 +176,7 @@ describe("agent lifecycle", () => {
 		const lastRunAt = new Date("2026-08-05T12:00:00.000Z");
 		await db.agentTrigger.create({
 			data: {
+				projectId,
 				agentId,
 				versionId,
 				type: "SCHEDULE",

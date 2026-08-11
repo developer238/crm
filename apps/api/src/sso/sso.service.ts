@@ -7,7 +7,6 @@ import {
 	ssoCallbackBase,
 	ssoCallbackURL,
 	ssoProviderName,
-	WORKSPACE_ID,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
@@ -21,6 +20,7 @@ import {
 } from "@nestjs/common";
 import { APIError } from "better-auth/api";
 import { InjectDatabase } from "../database/database.constants";
+import { currentOrganizationId } from "../projects/project-context";
 import { type ListResult, paginate, resolveOrderBy } from "../trpc/list-input";
 import type {
 	DeleteSsoProviderInput,
@@ -138,7 +138,6 @@ export class SsoService {
 
 	async signInOptions(): Promise<SignInOptions> {
 		const rows = await this.db.ssoProvider.findMany({
-			where: { organizationId: WORKSPACE_ID },
 			select: { providerId: true },
 			orderBy: { providerId: "asc" },
 		});
@@ -200,7 +199,7 @@ export class SsoService {
 					providerId: input.providerId,
 					issuer: input.issuer,
 					domain: domains.join(","),
-					organizationId: WORKSPACE_ID,
+					organizationId: currentOrganizationId(),
 					oidcConfig: {
 						clientId: input.clientId,
 						clientSecret: input.clientSecret,
@@ -251,7 +250,7 @@ export class SsoService {
 	private searchWhere(q: string): Prisma.SsoProviderWhereInput {
 		const term = q.trim();
 		const where: Prisma.SsoProviderWhereInput = {
-			organizationId: WORKSPACE_ID,
+			organizationId: currentOrganizationId(),
 		};
 
 		if (term) {
@@ -301,7 +300,10 @@ export class SsoService {
 	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: {
+					organizationId: currentOrganizationId(),
+					userId,
+				},
 			},
 			select: { role: true },
 		});

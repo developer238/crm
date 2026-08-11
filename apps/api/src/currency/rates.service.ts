@@ -12,6 +12,7 @@ import {
 } from "@crm/db/settings";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
+import { currentProjectId } from "../projects/project-context";
 
 export const RATES_PROVIDER = "open.er-api.com";
 
@@ -56,11 +57,11 @@ export class RatesService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
 	async refreshedAt(): Promise<Date | null> {
-		return readRatesRefreshedAt(this.db);
+		return readRatesRefreshedAt(this.db, currentProjectId());
 	}
 
 	async refresh(): Promise<RateRefresh> {
-		const base = await readReportingCurrency(this.db);
+		const base = await readReportingCurrency(this.db, currentProjectId());
 		const quotes = await this.fetch(base);
 
 		if (!quotes) {
@@ -75,7 +76,7 @@ export class RatesService {
 
 		const written = await this.store(base, quotes.rates, quotes.asOf);
 
-		await writeRatesRefreshedAt(this.db, new Date());
+		await writeRatesRefreshedAt(this.db, currentProjectId(), new Date());
 
 		this.logger.log({
 			message: "Exchange rates refreshed",

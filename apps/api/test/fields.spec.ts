@@ -17,6 +17,7 @@ import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
+import { createTestProject, type TestProject } from "./project-fixture";
 
 const suffix = process.env.TEST_RUN_ID ?? "fields-spec";
 const domain = `fields-${suffix}.test`;
@@ -84,14 +85,20 @@ async function clean() {
 
 async function makeCompany(name: string): Promise<string> {
 	const company = await db.company.create({
-		data: { name: `${name} ${suffix}`, domain: `${name}-${domain}` },
+		data: { projectId, name: `${name} ${suffix}`, domain: `${name}-${domain}` },
 		select: { id: true },
 	});
 
 	return company.id;
 }
 
+let fixture: TestProject;
+let projectId = "";
+
 beforeAll(async () => {
+	fixture = await createTestProject("api-test");
+	projectId = fixture.projectId;
+
 	bridgeSecret = process.env.AGENT_BRIDGE_SECRET;
 	process.env.AGENT_BRIDGE_SECRET = "";
 
@@ -490,6 +497,7 @@ describe("a record update that fails", () => {
 
 		const contact = await db.contact.create({
 			data: {
+				projectId,
 				firstName: "Ada",
 				email: `ada@${domain}`,
 				companyId,
@@ -523,7 +531,7 @@ describe("a record update that fails", () => {
 		});
 
 		const deal = await db.deal.create({
-			data: { name: `Spec deal ${suffix}`, companyId, ownerId },
+			data: { projectId, name: `Spec deal ${suffix}`, companyId, ownerId },
 			select: { id: true },
 		});
 

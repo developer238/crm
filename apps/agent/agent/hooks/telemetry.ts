@@ -2,6 +2,7 @@ import { db } from "@crm/db";
 import { readAgentModel } from "@crm/db/settings";
 import { agentError, modelError } from "@crm/telemetry";
 import { defineHook } from "eve/hooks";
+import { currentProjectId } from "../lib/focus";
 
 let modelId: string | null = null;
 
@@ -9,7 +10,7 @@ async function configuredModel(): Promise<string | null> {
 	if (modelId) return modelId;
 
 	try {
-		modelId = (await readAgentModel(db)).id;
+		modelId = (await readAgentModel(db, currentProjectId())).id;
 	} catch {
 		modelId = null;
 	}

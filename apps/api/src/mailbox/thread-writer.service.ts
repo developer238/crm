@@ -10,6 +10,7 @@ import {
 import { Injectable, Logger } from "@nestjs/common";
 import { ActivityStampService } from "../crm/activity-stamp.service";
 import { InjectDatabase } from "../database/database.constants";
+import { currentProjectId } from "../projects/project-context";
 import type { SyncSource } from "./mailbox.constants";
 import {
 	MailboxMatchService,
@@ -63,7 +64,12 @@ export class ThreadWriterService {
 		context: MatchContext,
 	): Promise<boolean> {
 		const existing = await this.db.emailMessage.findUnique({
-			where: { rfcMessageId: parsed.rfcMessageId },
+			where: {
+				projectId_rfcMessageId: {
+					projectId: currentProjectId(),
+					rfcMessageId: parsed.rfcMessageId,
+				},
+			},
 			select: {
 				threadId: true,
 				thread: {
@@ -88,7 +94,12 @@ export class ThreadWriterService {
 					contactId: existing.thread.contactId,
 				}
 			: await this.db.emailThread.findUnique({
-					where: { rootMessageId: parsed.rootId },
+					where: {
+						projectId_rootMessageId: {
+							projectId: currentProjectId(),
+							rootMessageId: parsed.rootId,
+						},
+					},
 					select: { id: true, companyId: true, contactId: true },
 				});
 
@@ -125,8 +136,14 @@ export class ThreadWriterService {
 				const record = existing
 					? { id: existing.threadId }
 					: await tx.emailThread.upsert({
-							where: { rootMessageId: parsed.rootId },
+							where: {
+								projectId_rootMessageId: {
+									projectId: currentProjectId(),
+									rootMessageId: parsed.rootId,
+								},
+							},
 							create: {
+								projectId: currentProjectId(),
 								rootMessageId: parsed.rootId,
 								subject: parsed.subject,
 								companyId,
@@ -142,6 +159,7 @@ export class ThreadWriterService {
 				if (!repair) {
 					await tx.emailMessage.create({
 						data: {
+							projectId: currentProjectId(),
 							threadId: record.id,
 							rfcMessageId: parsed.rfcMessageId,
 							syncedByUserId: row.userId,
@@ -270,6 +288,7 @@ export class ThreadWriterService {
 		const activity = await tx.activity.upsert({
 			where: { emailThreadId },
 			create: {
+				projectId: currentProjectId(),
 				type: ActivityType.EMAIL,
 				subject: summary.subject,
 				body: summary.snippet,

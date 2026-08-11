@@ -2,7 +2,7 @@ import { ActivityType, db } from "@crm/db";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { extract } from "../lib/context-dev";
-import { spend } from "../lib/focus";
+import { currentProjectId, spend } from "../lib/focus";
 
 const RESEARCH_SCHEMA = {
 	type: "object",
@@ -92,6 +92,7 @@ export default defineTool({
 
 		const activity = await db.activity.create({
 			data: {
+				projectId: currentProjectId(),
 				type: ActivityType.ENRICHMENT,
 				subject: `Research brief — ${company.name}`,
 				body: formatBrief(result.data),

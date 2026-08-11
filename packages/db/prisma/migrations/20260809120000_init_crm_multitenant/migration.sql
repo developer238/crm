@@ -1,0 +1,1634 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "crm";
+
+-- CreateEnum
+CREATE TYPE "DealStage" AS ENUM ('DEMO_BOOKED', 'QUALIFIED_TO_BUY', 'UNQUALIFIED_TO_BUY', 'DECISION_MAKER_BOUGHT_IN', 'CONTRACT_SENT', 'CLOSED_WON', 'CLOSED_LOST');
+
+-- CreateEnum
+CREATE TYPE "ActivityType" AS ENUM ('NOTE', 'CALL', 'EMAIL', 'MEETING', 'TASK', 'STAGE_CHANGE', 'ENRICHMENT');
+
+-- CreateEnum
+CREATE TYPE "EnrichmentStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETE', 'FAILED', 'SKIPPED');
+
+-- CreateEnum
+CREATE TYPE "RecordSource" AS ENUM ('MANUAL', 'IMPORT', 'EMAIL', 'CALENDAR');
+
+-- CreateEnum
+CREATE TYPE "AgentConversationKind" AS ENUM ('RECORD', 'BUILDER');
+
+-- CreateEnum
+CREATE TYPE "AgentDefinitionStatus" AS ENUM ('DRAFT', 'DEPLOYING', 'LIVE', 'PAUSED', 'ARCHIVED', 'DELETED');
+
+-- CreateEnum
+CREATE TYPE "AgentVersionStatus" AS ENUM ('DRAFT', 'VALIDATING', 'READY', 'DEPLOYED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "AgentBuilderArtifactStatus" AS ENUM ('WRITING', 'READY');
+
+-- CreateEnum
+CREATE TYPE "AgentTriggerType" AS ENUM ('MANUAL', 'SCHEDULE', 'EVENT', 'WEBHOOK');
+
+-- CreateEnum
+CREATE TYPE "AgentRunStatus" AS ENUM ('QUEUED', 'RUNNING', 'WAITING_FOR_APPROVAL', 'SUCCEEDED', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "AgentActionStatus" AS ENUM ('PLANNED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "AgentConversationShareScope" AS ENUM ('WORKSPACE_LINK');
+
+-- CreateEnum
+CREATE TYPE "AgentConversationSubmissionStatus" AS ENUM ('PENDING', 'SENDING', 'ACCEPTED', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "AgentConversationCommandType" AS ENUM ('CHAT', 'CREATE_AGENT');
+
+-- CreateEnum
+CREATE TYPE "AgentResponseRating" AS ENUM ('UP', 'DOWN');
+
+-- CreateEnum
+CREATE TYPE "FactBand" AS ENUM ('VERIFIED', 'PROBABLE', 'POSSIBLE');
+
+-- CreateEnum
+CREATE TYPE "FactStatus" AS ENUM ('APPLIED', 'PROPOSED', 'DISMISSED', 'SUPERSEDED');
+
+-- CreateEnum
+CREATE TYPE "RateSource" AS ENUM ('FETCHED', 'MANUAL');
+
+-- CreateEnum
+CREATE TYPE "FieldEntity" AS ENUM ('COMPANY', 'CONTACT', 'DEAL');
+
+-- CreateEnum
+CREATE TYPE "FieldType" AS ENUM ('TEXT', 'LONG_TEXT', 'NUMBER', 'DATE', 'CHECKBOX', 'SELECT', 'URL', 'EMAIL', 'PHONE', 'USER');
+
+-- CreateEnum
+CREATE TYPE "GoogleSyncStatus" AS ENUM ('IDLE', 'RUNNING', 'NEEDS_RECONNECT', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "EmailDirection" AS ENUM ('INBOUND', 'OUTBOUND');
+
+-- CreateTable
+CREATE TABLE "user" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "session" (
+    "id" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "userId" TEXT NOT NULL,
+    "activeOrganizationId" TEXT,
+
+    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "account" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "verification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "rateLimit" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "count" INTEGER NOT NULL,
+    "lastRequest" BIGINT NOT NULL,
+
+    CONSTRAINT "rateLimit_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "company" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "domain" TEXT,
+    "website" TEXT,
+    "description" TEXT,
+    "logoUrl" TEXT,
+    "logoDarkUrl" TEXT,
+    "iconUrl" TEXT,
+    "iconDarkUrl" TEXT,
+    "iconTone" TEXT,
+    "brandColor" TEXT,
+    "industry" TEXT,
+    "subIndustry" TEXT,
+    "city" TEXT,
+    "stateCode" TEXT,
+    "country" TEXT,
+    "countryCode" TEXT,
+    "phone" TEXT,
+    "email" TEXT,
+    "linkedinUrl" TEXT,
+    "twitterUrl" TEXT,
+    "githubUrl" TEXT,
+    "pricingUrl" TEXT,
+    "careersUrl" TEXT,
+    "ownerId" TEXT,
+    "primaryContactId" TEXT,
+    "enrichmentStatus" "EnrichmentStatus" NOT NULL DEFAULT 'PENDING',
+    "enrichedAt" TIMESTAMP(3),
+    "enrichmentError" TEXT,
+    "source" "RecordSource" NOT NULL DEFAULT 'MANUAL',
+    "lastActivityAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "company_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "companyEnrichment" (
+    "companyId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'context.dev',
+    "raw" JSONB NOT NULL,
+    "fetchedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "companyEnrichment_pkey" PRIMARY KEY ("companyId")
+);
+
+-- CreateTable
+CREATE TABLE "contact" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT,
+    "email" TEXT,
+    "phone" TEXT,
+    "title" TEXT,
+    "linkedinUrl" TEXT,
+    "twitterUrl" TEXT,
+    "githubUrl" TEXT,
+    "imageUrl" TEXT,
+    "socialsCheckedAt" TIMESTAMP(3),
+    "enrichmentStatus" "EnrichmentStatus" NOT NULL DEFAULT 'PENDING',
+    "enrichedAt" TIMESTAMP(3),
+    "enrichmentError" TEXT,
+    "companyId" TEXT,
+    "ownerId" TEXT,
+    "source" "RecordSource" NOT NULL DEFAULT 'MANUAL',
+    "lastActivityAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "contact_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "contactFact" (
+    "id" TEXT NOT NULL,
+    "contactId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "field" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "score" DOUBLE PRECISION NOT NULL,
+    "band" "FactBand" NOT NULL,
+    "evidence" JSONB NOT NULL,
+    "method" TEXT NOT NULL,
+    "sourceUrl" TEXT,
+    "sessionId" TEXT,
+    "status" "FactStatus" NOT NULL DEFAULT 'PROPOSED',
+    "decidedById" TEXT,
+    "decidedAt" TIMESTAMP(3),
+    "observedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "supersededAt" TIMESTAMP(3),
+
+    CONSTRAINT "contactFact_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "contactBrief" (
+    "contactId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "narrative" TEXT NOT NULL,
+    "sections" JSONB NOT NULL,
+    "score" DOUBLE PRECISION NOT NULL,
+    "sourceUrl" TEXT,
+    "sessionId" TEXT,
+    "refreshedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "contactBrief_pkey" PRIMARY KEY ("contactId")
+);
+
+-- CreateTable
+CREATE TABLE "agentTask" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "contactId" TEXT,
+    "companyId" TEXT,
+    "kind" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "priority" INTEGER NOT NULL DEFAULT 0,
+    "budget" INTEGER NOT NULL DEFAULT 4,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "dueAt" TIMESTAMP(3) NOT NULL,
+    "leasedUntil" TIMESTAMP(3),
+    "sessionId" TEXT,
+    "startedAt" TIMESTAMP(3),
+    "finishedAt" TIMESTAMP(3),
+    "outcome" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "agentTask_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentEvent" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "sessionId" TEXT NOT NULL,
+    "contactId" TEXT,
+    "type" TEXT NOT NULL,
+    "data" JSONB NOT NULL,
+    "emittedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "agentEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentConversation" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "kind" "AgentConversationKind" NOT NULL DEFAULT 'RECORD',
+    "contactId" TEXT,
+    "companyId" TEXT,
+    "dealId" TEXT,
+    "userId" TEXT NOT NULL,
+    "agentId" TEXT,
+    "sessionId" TEXT,
+    "continuationToken" TEXT,
+    "streamIndex" INTEGER NOT NULL DEFAULT 0,
+    "title" TEXT,
+    "messageCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "lastMessageAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastAssistantAt" TIMESTAMP(3),
+    "lastReadAt" TIMESTAMP(3),
+
+    CONSTRAINT "agentConversation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentConversationFeedback" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "messageId" TEXT NOT NULL,
+    "rating" "AgentResponseRating" NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "agentConversationFeedback_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentConversationShare" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "createdById" TEXT NOT NULL,
+    "scope" "AgentConversationShareScope" NOT NULL DEFAULT 'WORKSPACE_LINK',
+    "tokenHash" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3),
+    "revokedAt" TIMESTAMP(3),
+
+    CONSTRAINT "agentConversationShare_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentConversationSubmission" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "submittedById" TEXT NOT NULL,
+    "clientRequestId" TEXT NOT NULL,
+    "inputRequestId" TEXT,
+    "commandType" "AgentConversationCommandType" NOT NULL DEFAULT 'CHAT',
+    "message" JSONB NOT NULL,
+    "status" "AgentConversationSubmissionStatus" NOT NULL DEFAULT 'PENDING',
+    "attemptCount" INTEGER NOT NULL DEFAULT 0,
+    "errorCode" TEXT,
+    "errorMessage" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sentAt" TIMESTAMP(3),
+    "acceptedAt" TIMESTAMP(3),
+
+    CONSTRAINT "agentConversationSubmission_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentConversationAttachment" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "submissionId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "mediaType" TEXT NOT NULL,
+    "size" INTEGER NOT NULL,
+    "content" BYTEA NOT NULL,
+    "position" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "agentConversationAttachment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentDefinition" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "status" "AgentDefinitionStatus" NOT NULL DEFAULT 'DRAFT',
+    "createdById" TEXT NOT NULL,
+    "currentVersionId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "archivedAt" TIMESTAMP(3),
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "agentDefinition_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentVersion" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "agentId" TEXT NOT NULL,
+    "number" INTEGER NOT NULL,
+    "status" "AgentVersionStatus" NOT NULL DEFAULT 'DRAFT',
+    "instructions" TEXT NOT NULL,
+    "manifest" JSONB NOT NULL,
+    "modelId" TEXT NOT NULL,
+    "modelContextWindowTokens" INTEGER NOT NULL DEFAULT 1000000,
+    "sandboxPolicy" JSONB NOT NULL,
+    "validation" JSONB,
+    "sourceConversationId" TEXT,
+    "createdById" TEXT NOT NULL,
+    "deploymentId" TEXT,
+    "approvedAt" TIMESTAMP(3),
+    "deployedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "agentVersion_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentBuilderArtifact" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "conversationId" TEXT,
+    "versionId" TEXT,
+    "path" TEXT NOT NULL,
+    "language" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "previousContent" TEXT,
+    "revision" INTEGER NOT NULL,
+    "status" "AgentBuilderArtifactStatus" NOT NULL DEFAULT 'WRITING',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "agentBuilderArtifact_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentTrigger" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "agentId" TEXT NOT NULL,
+    "versionId" TEXT NOT NULL,
+    "type" "AgentTriggerType" NOT NULL,
+    "name" TEXT NOT NULL,
+    "config" JSONB NOT NULL,
+    "createdById" TEXT NOT NULL,
+    "enabled" BOOLEAN NOT NULL DEFAULT false,
+    "nextRunAt" TIMESTAMP(3),
+    "lastRunAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "agentTrigger_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentRun" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "agentId" TEXT NOT NULL,
+    "versionId" TEXT NOT NULL,
+    "triggerId" TEXT,
+    "initiatedById" TEXT,
+    "triggerType" "AgentTriggerType" NOT NULL,
+    "status" "AgentRunStatus" NOT NULL DEFAULT 'QUEUED',
+    "principalId" TEXT,
+    "sessionId" TEXT,
+    "idempotencyKey" TEXT NOT NULL,
+    "correlationId" TEXT NOT NULL,
+    "input" JSONB,
+    "result" JSONB,
+    "summary" TEXT,
+    "modelId" TEXT,
+    "inputTokens" INTEGER,
+    "outputTokens" INTEGER,
+    "costUsd" DECIMAL(12,6),
+    "errorCode" TEXT,
+    "errorMessage" TEXT,
+    "nextEventSequence" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "startedAt" TIMESTAMP(3),
+    "finishedAt" TIMESTAMP(3),
+
+    CONSTRAINT "agentRun_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentRunEvent" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "runId" TEXT NOT NULL,
+    "sequence" INTEGER NOT NULL,
+    "type" TEXT NOT NULL,
+    "data" JSONB NOT NULL,
+    "emittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "agentRunEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentAction" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "agentId" TEXT NOT NULL,
+    "runId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "provider" TEXT NOT NULL,
+    "targetType" TEXT,
+    "targetId" TEXT,
+    "targetLabel" TEXT,
+    "summary" TEXT NOT NULL,
+    "metadata" JSONB,
+    "status" "AgentActionStatus" NOT NULL DEFAULT 'PLANNED',
+    "idempotencyKey" TEXT NOT NULL,
+    "requestHash" TEXT,
+    "externalId" TEXT,
+    "attemptCount" INTEGER NOT NULL DEFAULT 0,
+    "errorCode" TEXT,
+    "errorMessage" TEXT,
+    "plannedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "startedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "agentAction_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agentAuditEvent" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "agentId" TEXT NOT NULL,
+    "versionId" TEXT,
+    "actorUserId" TEXT,
+    "type" TEXT NOT NULL,
+    "actorType" TEXT NOT NULL,
+    "actorId" TEXT,
+    "summary" TEXT NOT NULL,
+    "before" JSONB,
+    "after" JSONB,
+    "requestId" TEXT,
+    "emittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "agentAuditEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "deal" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "companyId" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
+    "stage" "DealStage" NOT NULL DEFAULT 'DEMO_BOOKED',
+    "stageChangedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "amount" DECIMAL(14,2),
+    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "expectedCloseDate" TIMESTAMP(3),
+    "closedAt" TIMESTAMP(3),
+    "closedReason" TEXT,
+    "baseAmount" DECIMAL(24,4),
+    "baseCurrency" TEXT,
+    "fxRate" DECIMAL(20,10),
+    "fxRateAt" TIMESTAMP(3),
+    "lastActivityAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "deal_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "exchangeRate" (
+    "id" TEXT NOT NULL,
+    "baseCurrency" TEXT NOT NULL,
+    "quoteCurrency" TEXT NOT NULL,
+    "rate" DECIMAL(20,10) NOT NULL,
+    "asOf" TIMESTAMP(3) NOT NULL,
+    "source" "RateSource" NOT NULL,
+    "provider" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "exchangeRate_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "dealContact" (
+    "dealId" TEXT NOT NULL,
+    "contactId" TEXT NOT NULL,
+    "role" TEXT,
+    "projectId" TEXT NOT NULL,
+
+    CONSTRAINT "dealContact_pkey" PRIMARY KEY ("dealId","contactId")
+);
+
+-- CreateTable
+CREATE TABLE "fieldDefinition" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "entity" "FieldEntity" NOT NULL,
+    "key" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "type" "FieldType" NOT NULL,
+    "agentFilled" BOOLEAN NOT NULL DEFAULT true,
+    "agentBrief" TEXT,
+    "required" BOOLEAN NOT NULL DEFAULT false,
+    "showOnSheet" BOOLEAN NOT NULL DEFAULT true,
+    "showOnTable" BOOLEAN NOT NULL DEFAULT false,
+    "position" INTEGER NOT NULL,
+    "archivedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fieldDefinition_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fieldOption" (
+    "id" TEXT NOT NULL,
+    "fieldId" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "archivedAt" TIMESTAMP(3),
+
+    CONSTRAINT "fieldOption_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fieldValue" (
+    "id" TEXT NOT NULL,
+    "fieldId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "companyId" TEXT,
+    "contactId" TEXT,
+    "dealId" TEXT,
+    "text" TEXT,
+    "number" DECIMAL(24,4),
+    "date" TIMESTAMP(3),
+    "bool" BOOLEAN,
+    "optionId" TEXT,
+    "userId" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fieldValue_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "activity" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "type" "ActivityType" NOT NULL,
+    "subject" TEXT,
+    "body" TEXT,
+    "occurredAt" TIMESTAMP(3),
+    "dueAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "companyId" TEXT,
+    "contactId" TEXT,
+    "dealId" TEXT,
+    "createdById" TEXT NOT NULL,
+    "meta" JSONB,
+    "emailThreadId" TEXT,
+    "calendarEventId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "activity_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "mailboxSync" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "status" "GoogleSyncStatus" NOT NULL DEFAULT 'IDLE',
+    "cursor" TEXT,
+    "lastSyncedAt" TIMESTAMP(3),
+    "lastError" TEXT,
+    "retryAfter" TIMESTAMP(3),
+    "autoCreate" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "mailboxSync_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "emailThread" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "rootMessageId" TEXT NOT NULL,
+    "subject" TEXT,
+    "companyId" TEXT,
+    "contactId" TEXT,
+    "firstMessageAt" TIMESTAMP(3) NOT NULL,
+    "lastMessageAt" TIMESTAMP(3) NOT NULL,
+    "messageCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "emailThread_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "emailMessage" (
+    "id" TEXT NOT NULL,
+    "threadId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "rfcMessageId" TEXT NOT NULL,
+    "syncedByUserId" TEXT,
+    "gmailMessageId" TEXT,
+    "outlookMessageId" TEXT,
+    "outlookWebLink" TEXT,
+    "direction" "EmailDirection" NOT NULL,
+    "fromEmail" TEXT NOT NULL,
+    "fromName" TEXT,
+    "recipients" JSONB NOT NULL,
+    "subject" TEXT,
+    "snippet" TEXT,
+    "body" TEXT,
+    "sentAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "emailMessage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "calendarEvent" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "iCalUid" TEXT NOT NULL,
+    "originalStartTime" TIMESTAMP(3) NOT NULL,
+    "recurringEventId" TEXT,
+    "title" TEXT,
+    "description" TEXT,
+    "location" TEXT,
+    "conferenceUrl" TEXT,
+    "startsAt" TIMESTAMP(3) NOT NULL,
+    "endsAt" TIMESTAMP(3) NOT NULL,
+    "isAllDay" BOOLEAN NOT NULL DEFAULT false,
+    "status" TEXT NOT NULL,
+    "organizerEmail" TEXT,
+    "companyId" TEXT,
+    "contactId" TEXT,
+    "syncedByUserId" TEXT,
+    "googleEventId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "calendarEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "calendarAttendee" (
+    "id" TEXT NOT NULL,
+    "eventId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "name" TEXT,
+    "responseStatus" TEXT,
+    "isOrganizer" BOOLEAN NOT NULL DEFAULT false,
+    "contactId" TEXT,
+
+    CONSTRAINT "calendarAttendee_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "suppressedDomain" (
+    "projectId" TEXT NOT NULL,
+    "domain" TEXT NOT NULL,
+    "reason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "suppressedDomain_pkey" PRIMARY KEY ("projectId","domain")
+);
+
+-- CreateTable
+CREATE TABLE "suppressedContact" (
+    "projectId" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "reason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "suppressedContact_pkey" PRIMARY KEY ("projectId","email")
+);
+
+-- CreateTable
+CREATE TABLE "appSetting" (
+    "projectId" TEXT NOT NULL,
+    "agentModelId" TEXT,
+    "agentModelContextWindow" INTEGER,
+    "contextDevApiKey" TEXT,
+    "reportingCurrency" TEXT,
+    "ratesRefreshedAt" TIMESTAMP(3),
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "appSetting_pkey" PRIMARY KEY ("projectId")
+);
+
+-- CreateTable
+CREATE TABLE "install" (
+    "id" TEXT NOT NULL,
+    "uuid" TEXT NOT NULL,
+    "version" TEXT NOT NULL,
+    "lastRollupAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "install_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "telemetryMilestone" (
+    "step" TEXT NOT NULL,
+    "reachedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "telemetryMilestone_pkey" PRIMARY KEY ("step")
+);
+
+-- CreateTable
+CREATE TABLE "telemetryCounter" (
+    "name" TEXT NOT NULL,
+    "count" INTEGER NOT NULL DEFAULT 0,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "telemetryCounter_pkey" PRIMARY KEY ("name")
+);
+
+-- CreateTable
+CREATE TABLE "organization" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "logo" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL,
+    "metadata" TEXT,
+    "website" TEXT,
+
+    CONSTRAINT "organization_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "project" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "website" TEXT,
+    "metadata" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "project_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "projectProfile" (
+    "projectId" TEXT NOT NULL,
+    "website" TEXT NOT NULL,
+    "narrative" TEXT NOT NULL,
+    "sections" JSONB NOT NULL,
+    "sourceUrl" TEXT,
+    "sessionId" TEXT,
+    "refreshedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "projectProfile_pkey" PRIMARY KEY ("projectId")
+);
+
+-- CreateTable
+CREATE TABLE "member" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'member',
+    "createdAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "member_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invitation" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "role" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "inviterId" TEXT NOT NULL,
+
+    CONSTRAINT "invitation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ssoProvider" (
+    "id" TEXT NOT NULL,
+    "issuer" TEXT NOT NULL,
+    "oidcConfig" TEXT,
+    "samlConfig" TEXT,
+    "userId" TEXT,
+    "providerId" TEXT NOT NULL,
+    "organizationId" TEXT,
+    "domain" TEXT NOT NULL,
+
+    CONSTRAINT "ssoProvider_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
+
+-- CreateIndex
+CREATE INDEX "session_userId_idx" ON "session"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
+
+-- CreateIndex
+CREATE INDEX "account_userId_idx" ON "account"("userId");
+
+-- CreateIndex
+CREATE INDEX "verification_identifier_idx" ON "verification"("identifier");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "rateLimit_key_key" ON "rateLimit"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "company_primaryContactId_key" ON "company"("primaryContactId");
+
+-- CreateIndex
+CREATE INDEX "company_projectId_name_idx" ON "company"("projectId", "name");
+
+-- CreateIndex
+CREATE INDEX "company_projectId_lastActivityAt_idx" ON "company"("projectId", "lastActivityAt");
+
+-- CreateIndex
+CREATE INDEX "company_projectId_ownerId_idx" ON "company"("projectId", "ownerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "company_projectId_domain_key" ON "company"("projectId", "domain");
+
+-- CreateIndex
+CREATE INDEX "companyEnrichment_projectId_idx" ON "companyEnrichment"("projectId");
+
+-- CreateIndex
+CREATE INDEX "contact_projectId_companyId_idx" ON "contact"("projectId", "companyId");
+
+-- CreateIndex
+CREATE INDEX "contact_projectId_ownerId_idx" ON "contact"("projectId", "ownerId");
+
+-- CreateIndex
+CREATE INDEX "contact_projectId_lastActivityAt_idx" ON "contact"("projectId", "lastActivityAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "contact_projectId_email_key" ON "contact"("projectId", "email");
+
+-- CreateIndex
+CREATE INDEX "contactFact_contactId_field_status_idx" ON "contactFact"("contactId", "field", "status");
+
+-- CreateIndex
+CREATE INDEX "contactFact_projectId_status_observedAt_idx" ON "contactFact"("projectId", "status", "observedAt");
+
+-- CreateIndex
+CREATE INDEX "contactBrief_projectId_idx" ON "contactBrief"("projectId");
+
+-- CreateIndex
+CREATE INDEX "agentTask_dueAt_leasedUntil_idx" ON "agentTask"("dueAt", "leasedUntil");
+
+-- CreateIndex
+CREATE INDEX "agentTask_projectId_dueAt_leasedUntil_idx" ON "agentTask"("projectId", "dueAt", "leasedUntil");
+
+-- CreateIndex
+CREATE INDEX "agentTask_projectId_contactId_idx" ON "agentTask"("projectId", "contactId");
+
+-- CreateIndex
+CREATE INDEX "agentEvent_sessionId_emittedAt_idx" ON "agentEvent"("sessionId", "emittedAt");
+
+-- CreateIndex
+CREATE INDEX "agentEvent_projectId_contactId_emittedAt_idx" ON "agentEvent"("projectId", "contactId", "emittedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentConversation_sessionId_key" ON "agentConversation"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "agentConversation_contactId_lastMessageAt_idx" ON "agentConversation"("contactId", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "agentConversation_companyId_lastMessageAt_idx" ON "agentConversation"("companyId", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "agentConversation_dealId_lastMessageAt_idx" ON "agentConversation"("dealId", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "agentConversation_projectId_userId_kind_lastMessageAt_idx" ON "agentConversation"("projectId", "userId", "kind", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "agentConversation_projectId_agentId_lastMessageAt_idx" ON "agentConversation"("projectId", "agentId", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "agentConversationFeedback_conversationId_createdAt_idx" ON "agentConversationFeedback"("conversationId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentConversationFeedback_conversationId_userId_messageId_key" ON "agentConversationFeedback"("conversationId", "userId", "messageId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentConversationShare_tokenHash_key" ON "agentConversationShare"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "agentConversationShare_conversationId_revokedAt_idx" ON "agentConversationShare"("conversationId", "revokedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentConversationShare_one_active_per_conversation" ON "agentConversationShare"("conversationId") WHERE ("revokedAt" IS NULL);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentConversationSubmission_clientRequestId_key" ON "agentConversationSubmission"("clientRequestId");
+
+-- CreateIndex
+CREATE INDEX "agentConversationSubmission_conversationId_createdAt_idx" ON "agentConversationSubmission"("conversationId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "agentConversationSubmission_projectId_status_createdAt_idx" ON "agentConversationSubmission"("projectId", "status", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentConversationSubmission_conversationId_inputRequestId_key" ON "agentConversationSubmission"("conversationId", "inputRequestId");
+
+-- CreateIndex
+CREATE INDEX "agentConversationAttachment_submissionId_position_idx" ON "agentConversationAttachment"("submissionId", "position");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentDefinition_currentVersionId_key" ON "agentDefinition"("currentVersionId");
+
+-- CreateIndex
+CREATE INDEX "agentDefinition_projectId_status_updatedAt_idx" ON "agentDefinition"("projectId", "status", "updatedAt");
+
+-- CreateIndex
+CREATE INDEX "agentDefinition_projectId_createdById_createdAt_idx" ON "agentDefinition"("projectId", "createdById", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentDefinition_currentVersionId_id_key" ON "agentDefinition"("currentVersionId", "id");
+
+-- CreateIndex
+CREATE INDEX "agentVersion_agentId_createdAt_idx" ON "agentVersion"("agentId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "agentVersion_projectId_status_createdAt_idx" ON "agentVersion"("projectId", "status", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentVersion_agentId_number_key" ON "agentVersion"("agentId", "number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentVersion_id_agentId_key" ON "agentVersion"("id", "agentId");
+
+-- CreateIndex
+CREATE INDEX "agentBuilderArtifact_conversationId_createdAt_idx" ON "agentBuilderArtifact"("conversationId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "agentBuilderArtifact_projectId_versionId_path_idx" ON "agentBuilderArtifact"("projectId", "versionId", "path");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentBuilderArtifact_conversation_path_revision_key" ON "agentBuilderArtifact"("conversationId", "path", "revision") WHERE ("conversationId" IS NOT NULL);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentBuilderArtifact_version_path_revision_key" ON "agentBuilderArtifact"("versionId", "path", "revision") WHERE ("versionId" IS NOT NULL);
+
+-- CreateIndex
+CREATE INDEX "agentTrigger_agentId_enabled_idx" ON "agentTrigger"("agentId", "enabled");
+
+-- CreateIndex
+CREATE INDEX "agentTrigger_enabled_nextRunAt_idx" ON "agentTrigger"("enabled", "nextRunAt");
+
+-- CreateIndex
+CREATE INDEX "agentTrigger_projectId_versionId_idx" ON "agentTrigger"("projectId", "versionId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentTrigger_id_agentId_key" ON "agentTrigger"("id", "agentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentRun_sessionId_key" ON "agentRun"("sessionId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentRun_idempotencyKey_key" ON "agentRun"("idempotencyKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentRun_correlationId_key" ON "agentRun"("correlationId");
+
+-- CreateIndex
+CREATE INDEX "agentRun_agentId_createdAt_idx" ON "agentRun"("agentId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "agentRun_versionId_createdAt_idx" ON "agentRun"("versionId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "agentRun_projectId_status_createdAt_idx" ON "agentRun"("projectId", "status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "agentRun_triggerId_createdAt_idx" ON "agentRun"("triggerId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentRun_id_agentId_key" ON "agentRun"("id", "agentId");
+
+-- CreateIndex
+CREATE INDEX "agentRunEvent_runId_emittedAt_idx" ON "agentRunEvent"("runId", "emittedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentRunEvent_runId_sequence_key" ON "agentRunEvent"("runId", "sequence");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentAction_idempotencyKey_key" ON "agentAction"("idempotencyKey");
+
+-- CreateIndex
+CREATE INDEX "agentAction_agentId_plannedAt_idx" ON "agentAction"("agentId", "plannedAt");
+
+-- CreateIndex
+CREATE INDEX "agentAction_runId_plannedAt_idx" ON "agentAction"("runId", "plannedAt");
+
+-- CreateIndex
+CREATE INDEX "agentAction_provider_externalId_idx" ON "agentAction"("provider", "externalId");
+
+-- CreateIndex
+CREATE INDEX "agentAction_projectId_status_plannedAt_idx" ON "agentAction"("projectId", "status", "plannedAt");
+
+-- CreateIndex
+CREATE INDEX "agentAuditEvent_agentId_emittedAt_idx" ON "agentAuditEvent"("agentId", "emittedAt");
+
+-- CreateIndex
+CREATE INDEX "agentAuditEvent_versionId_emittedAt_idx" ON "agentAuditEvent"("versionId", "emittedAt");
+
+-- CreateIndex
+CREATE INDEX "agentAuditEvent_actorUserId_emittedAt_idx" ON "agentAuditEvent"("actorUserId", "emittedAt");
+
+-- CreateIndex
+CREATE INDEX "agentAuditEvent_projectId_type_emittedAt_idx" ON "agentAuditEvent"("projectId", "type", "emittedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agentAuditEvent_agentId_type_requestId_key" ON "agentAuditEvent"("agentId", "type", "requestId");
+
+-- CreateIndex
+CREATE INDEX "deal_companyId_idx" ON "deal"("companyId");
+
+-- CreateIndex
+CREATE INDEX "deal_projectId_ownerId_idx" ON "deal"("projectId", "ownerId");
+
+-- CreateIndex
+CREATE INDEX "deal_projectId_stage_idx" ON "deal"("projectId", "stage");
+
+-- CreateIndex
+CREATE INDEX "deal_projectId_expectedCloseDate_idx" ON "deal"("projectId", "expectedCloseDate");
+
+-- CreateIndex
+CREATE INDEX "deal_projectId_lastActivityAt_idx" ON "deal"("projectId", "lastActivityAt");
+
+-- CreateIndex
+CREATE INDEX "deal_projectId_baseAmount_idx" ON "deal"("projectId", "baseAmount");
+
+-- CreateIndex
+CREATE INDEX "deal_projectId_currency_idx" ON "deal"("projectId", "currency");
+
+-- CreateIndex
+CREATE INDEX "exchangeRate_baseCurrency_quoteCurrency_idx" ON "exchangeRate"("baseCurrency", "quoteCurrency");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "exchangeRate_baseCurrency_quoteCurrency_source_key" ON "exchangeRate"("baseCurrency", "quoteCurrency", "source");
+
+-- CreateIndex
+CREATE INDEX "dealContact_contactId_idx" ON "dealContact"("contactId");
+
+-- CreateIndex
+CREATE INDEX "dealContact_projectId_idx" ON "dealContact"("projectId");
+
+-- CreateIndex
+CREATE INDEX "fieldDefinition_projectId_entity_position_idx" ON "fieldDefinition"("projectId", "entity", "position");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "fieldDefinition_projectId_entity_key_key" ON "fieldDefinition"("projectId", "entity", "key");
+
+-- CreateIndex
+CREATE INDEX "fieldOption_fieldId_position_idx" ON "fieldOption"("fieldId", "position");
+
+-- CreateIndex
+CREATE INDEX "fieldOption_projectId_idx" ON "fieldOption"("projectId");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_fieldId_text_idx" ON "fieldValue"("fieldId", "text");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_fieldId_number_idx" ON "fieldValue"("fieldId", "number");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_fieldId_date_idx" ON "fieldValue"("fieldId", "date");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_companyId_idx" ON "fieldValue"("companyId");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_contactId_idx" ON "fieldValue"("contactId");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_dealId_idx" ON "fieldValue"("dealId");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_optionId_idx" ON "fieldValue"("optionId");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_userId_idx" ON "fieldValue"("userId");
+
+-- CreateIndex
+CREATE INDEX "fieldValue_projectId_idx" ON "fieldValue"("projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "fieldValue_fieldId_companyId_key" ON "fieldValue"("fieldId", "companyId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "fieldValue_fieldId_contactId_key" ON "fieldValue"("fieldId", "contactId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "fieldValue_fieldId_dealId_key" ON "fieldValue"("fieldId", "dealId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "activity_emailThreadId_key" ON "activity"("emailThreadId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "activity_calendarEventId_key" ON "activity"("calendarEventId");
+
+-- CreateIndex
+CREATE INDEX "activity_companyId_createdAt_idx" ON "activity"("companyId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "activity_dealId_createdAt_idx" ON "activity"("dealId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "activity_contactId_createdAt_idx" ON "activity"("contactId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "activity_projectId_dueAt_idx" ON "activity"("projectId", "dueAt");
+
+-- CreateIndex
+CREATE INDEX "activity_projectId_createdById_idx" ON "activity"("projectId", "createdById");
+
+-- CreateIndex
+CREATE INDEX "mailboxSync_status_idx" ON "mailboxSync"("status");
+
+-- CreateIndex
+CREATE INDEX "mailboxSync_organizationId_idx" ON "mailboxSync"("organizationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "mailboxSync_userId_source_key" ON "mailboxSync"("userId", "source");
+
+-- CreateIndex
+CREATE INDEX "emailThread_companyId_lastMessageAt_idx" ON "emailThread"("companyId", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "emailThread_contactId_lastMessageAt_idx" ON "emailThread"("contactId", "lastMessageAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "emailThread_projectId_rootMessageId_key" ON "emailThread"("projectId", "rootMessageId");
+
+-- CreateIndex
+CREATE INDEX "emailMessage_threadId_sentAt_idx" ON "emailMessage"("threadId", "sentAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "emailMessage_projectId_rfcMessageId_key" ON "emailMessage"("projectId", "rfcMessageId");
+
+-- CreateIndex
+CREATE INDEX "calendarEvent_companyId_startsAt_idx" ON "calendarEvent"("companyId", "startsAt");
+
+-- CreateIndex
+CREATE INDEX "calendarEvent_contactId_startsAt_idx" ON "calendarEvent"("contactId", "startsAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "calendarEvent_projectId_iCalUid_originalStartTime_key" ON "calendarEvent"("projectId", "iCalUid", "originalStartTime");
+
+-- CreateIndex
+CREATE INDEX "calendarAttendee_contactId_idx" ON "calendarAttendee"("contactId");
+
+-- CreateIndex
+CREATE INDEX "calendarAttendee_projectId_idx" ON "calendarAttendee"("projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "calendarAttendee_eventId_email_key" ON "calendarAttendee"("eventId", "email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "install_uuid_key" ON "install"("uuid");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "organization_slug_key" ON "organization"("slug");
+
+-- CreateIndex
+CREATE INDEX "project_organizationId_idx" ON "project"("organizationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "project_organizationId_slug_key" ON "project"("organizationId", "slug");
+
+-- CreateIndex
+CREATE INDEX "member_organizationId_idx" ON "member"("organizationId");
+
+-- CreateIndex
+CREATE INDEX "member_userId_idx" ON "member"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "member_organizationId_userId_key" ON "member"("organizationId", "userId");
+
+-- CreateIndex
+CREATE INDEX "invitation_organizationId_idx" ON "invitation"("organizationId");
+
+-- CreateIndex
+CREATE INDEX "invitation_email_idx" ON "invitation"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ssoProvider_providerId_key" ON "ssoProvider"("providerId");
+
+-- AddForeignKey
+ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "company" ADD CONSTRAINT "company_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "company" ADD CONSTRAINT "company_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "company" ADD CONSTRAINT "company_primaryContactId_fkey" FOREIGN KEY ("primaryContactId") REFERENCES "contact"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "companyEnrichment" ADD CONSTRAINT "companyEnrichment_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "companyEnrichment" ADD CONSTRAINT "companyEnrichment_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contact" ADD CONSTRAINT "contact_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contact" ADD CONSTRAINT "contact_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contact" ADD CONSTRAINT "contact_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contactFact" ADD CONSTRAINT "contactFact_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contactFact" ADD CONSTRAINT "contactFact_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contactFact" ADD CONSTRAINT "contactFact_decidedById_fkey" FOREIGN KEY ("decidedById") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contactBrief" ADD CONSTRAINT "contactBrief_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "contactBrief" ADD CONSTRAINT "contactBrief_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentTask" ADD CONSTRAINT "agentTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentEvent" ADD CONSTRAINT "agentEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversation" ADD CONSTRAINT "agentConversation_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversation" ADD CONSTRAINT "agentConversation_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversation" ADD CONSTRAINT "agentConversation_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversation" ADD CONSTRAINT "agentConversation_dealId_fkey" FOREIGN KEY ("dealId") REFERENCES "deal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversation" ADD CONSTRAINT "agentConversation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversation" ADD CONSTRAINT "agentConversation_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "agentDefinition"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationFeedback" ADD CONSTRAINT "agentConversationFeedback_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationFeedback" ADD CONSTRAINT "agentConversationFeedback_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "agentConversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationFeedback" ADD CONSTRAINT "agentConversationFeedback_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationShare" ADD CONSTRAINT "agentConversationShare_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationShare" ADD CONSTRAINT "agentConversationShare_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "agentConversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationShare" ADD CONSTRAINT "agentConversationShare_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationSubmission" ADD CONSTRAINT "agentConversationSubmission_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationSubmission" ADD CONSTRAINT "agentConversationSubmission_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "agentConversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationSubmission" ADD CONSTRAINT "agentConversationSubmission_submittedById_fkey" FOREIGN KEY ("submittedById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationAttachment" ADD CONSTRAINT "agentConversationAttachment_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentConversationAttachment" ADD CONSTRAINT "agentConversationAttachment_submissionId_fkey" FOREIGN KEY ("submissionId") REFERENCES "agentConversationSubmission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentDefinition" ADD CONSTRAINT "agentDefinition_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentDefinition" ADD CONSTRAINT "agentDefinition_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentDefinition" ADD CONSTRAINT "agentDefinition_currentVersionId_id_fkey" FOREIGN KEY ("currentVersionId", "id") REFERENCES "agentVersion"("id", "agentId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentVersion" ADD CONSTRAINT "agentVersion_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentVersion" ADD CONSTRAINT "agentVersion_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "agentDefinition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentVersion" ADD CONSTRAINT "agentVersion_sourceConversationId_fkey" FOREIGN KEY ("sourceConversationId") REFERENCES "agentConversation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentVersion" ADD CONSTRAINT "agentVersion_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentBuilderArtifact" ADD CONSTRAINT "agentBuilderArtifact_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentBuilderArtifact" ADD CONSTRAINT "agentBuilderArtifact_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "agentConversation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentBuilderArtifact" ADD CONSTRAINT "agentBuilderArtifact_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "agentVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentTrigger" ADD CONSTRAINT "agentTrigger_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentTrigger" ADD CONSTRAINT "agentTrigger_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "agentDefinition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentTrigger" ADD CONSTRAINT "agentTrigger_versionId_agentId_fkey" FOREIGN KEY ("versionId", "agentId") REFERENCES "agentVersion"("id", "agentId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentTrigger" ADD CONSTRAINT "agentTrigger_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRun" ADD CONSTRAINT "agentRun_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRun" ADD CONSTRAINT "agentRun_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "agentDefinition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRun" ADD CONSTRAINT "agentRun_versionId_agentId_fkey" FOREIGN KEY ("versionId", "agentId") REFERENCES "agentVersion"("id", "agentId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRun" ADD CONSTRAINT "agentRun_triggerId_agentId_fkey" FOREIGN KEY ("triggerId", "agentId") REFERENCES "agentTrigger"("id", "agentId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRun" ADD CONSTRAINT "agentRun_initiatedById_fkey" FOREIGN KEY ("initiatedById") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRunEvent" ADD CONSTRAINT "agentRunEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentRunEvent" ADD CONSTRAINT "agentRunEvent_runId_fkey" FOREIGN KEY ("runId") REFERENCES "agentRun"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAction" ADD CONSTRAINT "agentAction_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAction" ADD CONSTRAINT "agentAction_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "agentDefinition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAction" ADD CONSTRAINT "agentAction_runId_agentId_fkey" FOREIGN KEY ("runId", "agentId") REFERENCES "agentRun"("id", "agentId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAuditEvent" ADD CONSTRAINT "agentAuditEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAuditEvent" ADD CONSTRAINT "agentAuditEvent_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "agentDefinition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAuditEvent" ADD CONSTRAINT "agentAuditEvent_versionId_agentId_fkey" FOREIGN KEY ("versionId", "agentId") REFERENCES "agentVersion"("id", "agentId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agentAuditEvent" ADD CONSTRAINT "agentAuditEvent_actorUserId_fkey" FOREIGN KEY ("actorUserId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "deal" ADD CONSTRAINT "deal_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "deal" ADD CONSTRAINT "deal_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "deal" ADD CONSTRAINT "deal_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dealContact" ADD CONSTRAINT "dealContact_dealId_fkey" FOREIGN KEY ("dealId") REFERENCES "deal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dealContact" ADD CONSTRAINT "dealContact_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "dealContact" ADD CONSTRAINT "dealContact_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldDefinition" ADD CONSTRAINT "fieldDefinition_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldOption" ADD CONSTRAINT "fieldOption_fieldId_fkey" FOREIGN KEY ("fieldId") REFERENCES "fieldDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldOption" ADD CONSTRAINT "fieldOption_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_fieldId_fkey" FOREIGN KEY ("fieldId") REFERENCES "fieldDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_dealId_fkey" FOREIGN KEY ("dealId") REFERENCES "deal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_optionId_fkey" FOREIGN KEY ("optionId") REFERENCES "fieldOption"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fieldValue" ADD CONSTRAINT "fieldValue_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_dealId_fkey" FOREIGN KEY ("dealId") REFERENCES "deal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_emailThreadId_fkey" FOREIGN KEY ("emailThreadId") REFERENCES "emailThread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "activity" ADD CONSTRAINT "activity_calendarEventId_fkey" FOREIGN KEY ("calendarEventId") REFERENCES "calendarEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "mailboxSync" ADD CONSTRAINT "mailboxSync_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "mailboxSync" ADD CONSTRAINT "mailboxSync_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "emailThread" ADD CONSTRAINT "emailThread_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "emailThread" ADD CONSTRAINT "emailThread_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "emailThread" ADD CONSTRAINT "emailThread_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "emailMessage" ADD CONSTRAINT "emailMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "emailThread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "emailMessage" ADD CONSTRAINT "emailMessage_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "calendarEvent" ADD CONSTRAINT "calendarEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "calendarEvent" ADD CONSTRAINT "calendarEvent_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "calendarEvent" ADD CONSTRAINT "calendarEvent_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "calendarAttendee" ADD CONSTRAINT "calendarAttendee_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "calendarEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "calendarAttendee" ADD CONSTRAINT "calendarAttendee_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "calendarAttendee" ADD CONSTRAINT "calendarAttendee_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "suppressedDomain" ADD CONSTRAINT "suppressedDomain_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "suppressedContact" ADD CONSTRAINT "suppressedContact_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "appSetting" ADD CONSTRAINT "appSetting_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project" ADD CONSTRAINT "project_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projectProfile" ADD CONSTRAINT "projectProfile_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member" ADD CONSTRAINT "member_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "member" ADD CONSTRAINT "member_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviterId_fkey" FOREIGN KEY ("inviterId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ssoProvider" ADD CONSTRAINT "ssoProvider_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

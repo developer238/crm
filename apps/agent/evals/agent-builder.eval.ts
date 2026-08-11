@@ -1,4 +1,5 @@
 import { db } from "@crm/db";
+import { projectSlug } from "@crm/db/project";
 import { defineEval } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
 
@@ -22,6 +23,7 @@ export default defineEval({
 
 		const suffix = crypto.randomUUID();
 		const userId = `builder-eval-user-${suffix}`;
+		let projectId = "";
 		let conversationId: string | null = null;
 		let sessionId: string | null = null;
 
@@ -33,12 +35,32 @@ export default defineEval({
 					email: `${userId}@example.test`,
 				},
 			});
+			const organization = await db.organization.create({
+				data: {
+					id: `builder-eval-org-${suffix}`,
+					name: "Agent Builder Eval",
+					slug: `builder-eval-${suffix}`,
+					createdAt: new Date(),
+				},
+				select: { id: true },
+			});
+			const project = await db.project.create({
+				data: {
+					organizationId: organization.id,
+					name: "Agent Builder Eval",
+					slug: projectSlug(`builder-eval-${suffix}`),
+				},
+				select: { id: true },
+			});
+			projectId = project.id;
 			const conversation = await db.agentConversation.create({
 				data: {
+					projectId,
 					kind: "BUILDER",
 					userId,
 					submissions: {
 						create: {
+							projectId,
 							submittedById: userId,
 							clientRequestId: crypto.randomUUID(),
 							commandType: "CREATE_AGENT",

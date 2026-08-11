@@ -22,8 +22,11 @@ import {
 import { type BulkResult, requireOwner, runBulk } from "../crm/bulk";
 import { blankToNull, toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
-import { InjectDatabase } from "../database/database.constants";
 import { FieldsService } from "../fields/fields.service";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import {
 	countsByKey,
 	FACET_ALL,
@@ -94,7 +97,7 @@ export class CompaniesService {
 	private readonly logger = new Logger(CompaniesService.name);
 
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly agent: AgentTriggerService,
 		private readonly queue: AgentQueueService,
 		private readonly favicon: FaviconService,
@@ -286,7 +289,7 @@ export class CompaniesService {
 
 		if (domain) {
 			const existing = await this.db.company.findUnique({
-				where: { domain },
+				where: { projectId_domain: { projectId: currentProjectId(), domain } },
 				select: { id: true, name: true },
 			});
 			if (existing) {
@@ -298,6 +301,7 @@ export class CompaniesService {
 
 		const company = await this.db.company.create({
 			data: {
+				projectId: currentProjectId(),
 				name: input.name.trim(),
 				domain,
 				website: domain ? `https://${domain}` : null,

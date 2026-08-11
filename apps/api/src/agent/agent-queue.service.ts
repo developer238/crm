@@ -1,10 +1,10 @@
 import type { Db } from "@crm/db";
 import { Injectable } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import { InjectProjectDatabase } from "../projects/project-context";
 
 @Injectable()
 export class AgentQueueService {
-	constructor(@InjectDatabase() private readonly db: Db) {}
+	constructor(@InjectProjectDatabase() private readonly db: Db) {}
 
 	async queuedCompanies(ids: readonly string[]): Promise<Set<string>> {
 		return this.queued("companyId", ids);

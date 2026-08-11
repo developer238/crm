@@ -1,13 +1,13 @@
 import {
 	canChangeRole,
 	canRenameWorkspace,
-	ensureWorkspaceMembership,
+	ensureOrganizationMembership,
 	isWorkspaceRole,
-	WORKSPACE_ID,
+	organizationSlug,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
-import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
+import { isOnboarded, markOnboarded } from "@crm/db/project";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -19,6 +19,7 @@ import {
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { normalizeDomain } from "../companies/domain";
 import { InjectDatabase } from "../database/database.constants";
+import { currentOrganizationId } from "../projects/project-context";
 import {
 	countsByKey,
 	FACET_ALL,
@@ -91,7 +92,7 @@ export class WorkspaceService {
 		let row = await this.readWorkspace();
 
 		if (!row) {
-			await ensureWorkspaceMembership(userId);
+			await ensureOrganizationMembership(userId);
 			row = await this.readWorkspace();
 		}
 
@@ -128,7 +129,7 @@ export class WorkspaceService {
 		}
 
 		const before = await this.db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: currentOrganizationId() },
 			select: { website: true, metadata: true },
 		});
 
@@ -141,10 +142,10 @@ export class WorkspaceService {
 		}
 
 		await this.db.organization.update({
-			where: { id: WORKSPACE_ID },
+			where: { id: currentOrganizationId() },
 			data: {
 				name: input.name,
-				slug: workspaceSlug(input.slug ?? input.name),
+				slug: organizationSlug(input.slug ?? input.name),
 				website,
 				metadata: markOnboarded(before?.metadata ?? null, new Date()),
 			},
@@ -208,7 +209,7 @@ export class WorkspaceService {
 
 		const updated = await this.db.$transaction(async (tx) => {
 			const target = await tx.member.findFirst({
-				where: { id: input.memberId, organizationId: WORKSPACE_ID },
+				where: { id: input.memberId, organizationId: currentOrganizationId() },
 				select: { id: true, role: true },
 			});
 
@@ -219,7 +220,7 @@ export class WorkspaceService {
 			if (target.role === "owner" && input.role !== "owner") {
 				const owners = await tx.$queryRaw<{ id: string }[]>`
 					SELECT id FROM "member"
-					WHERE "organizationId" = ${WORKSPACE_ID} AND role = 'owner'
+					WHERE "organizationId" = ${currentOrganizationId()} AND role = 'owner'
 					FOR UPDATE
 				`;
 
@@ -262,7 +263,9 @@ export class WorkspaceService {
 
 	private searchWhere(q: string): Prisma.MemberWhereInput {
 		const term = q.trim();
-		const where: Prisma.MemberWhereInput = { organizationId: WORKSPACE_ID };
+		const where: Prisma.MemberWhereInput = {
+			organizationId: currentOrganizationId(),
+		};
 
 		if (term) {
 			where.user = {
@@ -288,7 +291,7 @@ export class WorkspaceService {
 
 	private async readWorkspace() {
 		return this.db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: currentOrganizationId() },
 			select: {
 				id: true,
 				slug: true,
@@ -302,7 +305,10 @@ export class WorkspaceService {
 	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: {
+					organizationId: currentOrganizationId(),
+					userId,
+				},
 			},
 			select: { role: true },
 		});

@@ -1,6 +1,6 @@
 import { type Db, type Prisma, Prisma as PrismaNamespace } from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import { InjectProjectDatabase } from "../projects/project-context";
 
 export type ActivityTarget = {
 	companyId?: string | null;
@@ -22,7 +22,7 @@ function present(ids: (string | null)[]): string[] {
 export class ActivityStampService {
 	private readonly logger = new Logger(ActivityStampService.name);
 
-	constructor(@InjectDatabase() private readonly db: Db) {}
+	constructor(@InjectProjectDatabase() private readonly db: Db) {}
 
 	async touch(target: ActivityTarget, at: Date): Promise<void> {
 		const stale = {

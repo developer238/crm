@@ -1,6 +1,9 @@
 import { ActivityType, type Db } from "@crm/db";
 import { Injectable } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import { ActivityStampService } from "./activity-stamp.service";
 
 export type EnrichmentEvent = {
@@ -14,7 +17,7 @@ export type EnrichmentEvent = {
 @Injectable()
 export class EnrichmentLogService {
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly stamp: ActivityStampService,
 	) {}
 
@@ -24,6 +27,7 @@ export class EnrichmentLogService {
 
 		const activity = await this.db.activity.create({
 			data: {
+				projectId: currentProjectId(),
 				type: ActivityType.ENRICHMENT,
 				subject: event.subject,
 				body: event.body ?? null,

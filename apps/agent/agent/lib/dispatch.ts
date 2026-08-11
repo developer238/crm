@@ -2,6 +2,7 @@ import { EnrichmentStatus } from "@crm/db";
 import { APP_AUTH, type AppAuth } from "./app-auth";
 import { brandOutcome, runBrand } from "./brand";
 import { markRunning, settle } from "./enrichment";
+import { runForProject } from "./focus";
 import { collapsing, runLimited } from "./pool";
 import { runPortrait } from "./portrait";
 import {
@@ -59,6 +60,10 @@ export async function runVisibleLane(): Promise<number> {
 }
 
 async function runDirect(task: LeasedTask): Promise<void> {
+	return runForProject(task.projectId, () => runDirectWork(task));
+}
+
+async function runDirectWork(task: LeasedTask): Promise<void> {
 	try {
 		if (task.kind === "brand" && task.companyId) {
 			const result = await runBrand({ companyId: task.companyId });
@@ -120,6 +125,7 @@ export function taskAuth(task: LeasedTask, base: AppAuth = APP_AUTH): AppAuth {
 	return {
 		...base,
 		attributes: {
+			projectId: task.projectId,
 			taskKind: task.kind,
 			reason: task.reason,
 			budget: String(task.budget),

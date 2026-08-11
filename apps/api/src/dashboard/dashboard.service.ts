@@ -3,7 +3,7 @@ import { OPEN_DEAL_STAGES } from "@crm/db/deal-stage";
 import { Injectable } from "@nestjs/common";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
-import { InjectDatabase } from "../database/database.constants";
+import { InjectProjectDatabase } from "../projects/project-context";
 import type { DashboardSummaryInput } from "./dashboard.contracts";
 
 const OWNER_SELECT = {
@@ -32,7 +32,7 @@ function monthKey(date: Date): number {
 @Injectable()
 export class DashboardService {
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly conversion: ConversionService,
 	) {}
 

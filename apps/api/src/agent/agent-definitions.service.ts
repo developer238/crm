@@ -5,7 +5,10 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { InjectDatabase } from "../database/database.constants";
+import {
+	currentProjectId,
+	InjectProjectDatabase,
+} from "../projects/project-context";
 import { AgentAccessService } from "./agent-access.service";
 import { TEAM_AGENT_STATUSES } from "./agent-visibility";
 import type { AgentDeployInput, AgentUpdateInput } from "./agents.contracts";
@@ -13,7 +16,7 @@ import type { AgentDeployInput, AgentUpdateInput } from "./agents.contracts";
 @Injectable()
 export class AgentDefinitionsService {
 	constructor(
-		@InjectDatabase() private readonly db: Db,
+		@InjectProjectDatabase() private readonly db: Db,
 		private readonly access: AgentAccessService,
 	) {}
 
@@ -157,6 +160,7 @@ export class AgentDefinitionsService {
 
 			await tx.agentAuditEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: input.id,
 					actorUserId: userId,
 					actorType: "USER",
@@ -254,6 +258,7 @@ export class AgentDefinitionsService {
 
 			await tx.agentAuditEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: input.id,
 					versionId: input.versionId,
 					actorUserId: userId,
@@ -371,6 +376,7 @@ export class AgentDefinitionsService {
 
 				await tx.agentRunEvent.create({
 					data: {
+						projectId: currentProjectId(),
 						runId: run.id,
 						sequence: cancelled.nextEventSequence,
 						type: "run.cancelled",
@@ -388,6 +394,7 @@ export class AgentDefinitionsService {
 
 			await tx.agentAuditEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: id,
 					actorUserId: userId,
 					actorType: "USER",
@@ -437,6 +444,7 @@ export class AgentDefinitionsService {
 
 			await tx.agentAuditEvent.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: id,
 					actorUserId: userId,
 					actorType: "USER",

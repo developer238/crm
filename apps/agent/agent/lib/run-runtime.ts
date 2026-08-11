@@ -3,6 +3,7 @@ import { ActivityType, db, type Prisma } from "@crm/db";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import { readCompanyHistory, readDealHistory } from "./accounts";
 import { readCrmHistory } from "./crm";
+import { currentProjectId } from "./focus";
 import { searchCrm } from "./lookup";
 import { lockAgentRun, runTerminalEventId } from "./run-state";
 
@@ -223,6 +224,7 @@ export async function createRunActivity(
 
 			return tx.agentAction.create({
 				data: {
+					projectId: currentProjectId(),
 					agentId: run.agentId,
 					runId,
 					type: "crm.activity.create",
@@ -298,6 +300,7 @@ export async function createRunActivity(
 			await tx.activity.upsert({
 				where: { id: activityId },
 				create: {
+					projectId: currentProjectId(),
 					id: activityId,
 					type: input.type === "TASK" ? ActivityType.TASK : ActivityType.NOTE,
 					subject: input.subject?.trim() || null,
@@ -414,6 +417,7 @@ export async function finishRun(
 		});
 		await tx.agentRunEvent.create({
 			data: {
+				projectId: currentProjectId(),
 				id: runTerminalEventId(run.id, "completed"),
 				runId: run.id,
 				sequence,
@@ -431,6 +435,7 @@ export async function finishRun(
 				},
 			},
 			create: {
+				projectId: currentProjectId(),
 				agentId: run.agentId,
 				versionId: run.versionId,
 				actorType: "AGENT",

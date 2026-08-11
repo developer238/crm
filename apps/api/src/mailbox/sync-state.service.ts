@@ -5,6 +5,7 @@ import {
 } from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
+import { currentOrganizationId } from "../projects/project-context";
 import type { SyncSource } from "./mailbox.constants";
 
 export const SYNC_LEASE_MS = 300_000;
@@ -64,6 +65,7 @@ export class SyncStateService {
 		return this.db.mailboxSync.upsert({
 			where: { userId_source: { userId, source } },
 			create: {
+				organizationId: currentOrganizationId(),
 				userId,
 				source,
 				status: GoogleSyncStatus.IDLE,
