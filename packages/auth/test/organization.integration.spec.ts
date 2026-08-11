@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
-import { ensureWorkspaceMembership, WORKSPACE_ID } from "../src/organization";
+import { ensureOrganizationMembership } from "../src/organization";
 
 const suffix = process.env.TEST_RUN_ID ?? "organization-spec";
 
@@ -24,14 +24,19 @@ const seedUser = async (label: string, createdAt: Date): Promise<string> => {
 	return user.id;
 };
 
-const roleOf = async (userId: string): Promise<string | null> => {
-	const member = await db.member.findUnique({
-		where: { organizationId_userId: { organizationId: WORKSPACE_ID, userId } },
-		select: { role: true },
+const membershipOf = async (
+	userId: string,
+): Promise<{ organizationId: string; role: string } | null> => {
+	const member = await db.member.findFirst({
+		where: { userId },
+		select: { organizationId: true, role: true },
 	});
 
-	return member?.role ?? null;
+	return member;
 };
+
+const roleOf = async (userId: string): Promise<string | null> =>
+	(await membershipOf(userId))?.role ?? null;
 
 const clear = async () => {
 	await db.member.deleteMany({
@@ -41,14 +46,14 @@ const clear = async () => {
 		where: { email: { endsWith: `.${suffix}@example.test` } },
 	});
 
-	const strangers = await db.member.count({
-		where: { organizationId: WORKSPACE_ID },
+	const organizations = await db.organization.findMany({
+		select: { id: true, _count: { select: { members: true } } },
 	});
 
-	if (strangers > 0) {
-		throw new Error(
-			`${strangers} member row(s) this spec did not create are in the workspace, and it needs an empty one to test the owner backfill. It will not delete them: that is somebody's access. Point TEST_DATABASE_URL at a database of your own, or find the spec that leaked them.`,
-		);
+	for (const organization of organizations) {
+		if (organization._count.members > 0) continue;
+
+		await db.organization.delete({ where: { id: organization.id } });
 	}
 };
 
@@ -61,62 +66,68 @@ beforeEach(async () => {
 
 afterAll(clear);
 
-describe("ensureWorkspaceMembership", () => {
-	it("creates the one workspace and enrols everyone who already had an account", async () => {
-		const workspaceId = await ensureWorkspaceMembership(secondId);
+describe("ensureOrganizationMembership", () => {
+	it("makes the first person an owner, with a project to work in", async () => {
+		const organizationId = await ensureOrganizationMembership(firstId);
 
-		expect(workspaceId).toBe(WORKSPACE_ID);
+		expect(organizationId).toBeTruthy();
+		expect(await roleOf(firstId)).toBe("owner");
+
+		const projects = await db.project.count({ where: { organizationId } });
+		expect(projects).toBe(1);
+	});
+
+	it("puts the next person in the same organization, as a member", async () => {
+		const owner = await ensureOrganizationMembership(firstId);
+		const joiner = await ensureOrganizationMembership(secondId);
+
+		expect(joiner).toBe(owner);
 		expect(await roleOf(firstId)).toBe("owner");
 		expect(await roleOf(secondId)).toBe("member");
 	});
 
 	it("is idempotent, so signing in again neither duplicates nor re-roles", async () => {
-		await ensureWorkspaceMembership(secondId);
+		const organizationId = await ensureOrganizationMembership(firstId);
+		await ensureOrganizationMembership(secondId);
 
-		await db.member.update({
-			where: {
-				organizationId_userId: {
-					organizationId: WORKSPACE_ID,
-					userId: secondId,
-				},
-			},
+		await db.member.updateMany({
+			where: { organizationId, userId: secondId },
 			data: { role: "admin" },
 		});
 
-		await ensureWorkspaceMembership(secondId);
-		await ensureWorkspaceMembership(secondId);
+		await ensureOrganizationMembership(secondId);
+		await ensureOrganizationMembership(secondId);
 
 		const rows = await db.member.findMany({
-			where: { organizationId: WORKSPACE_ID, userId: secondId },
+			where: { organizationId, userId: secondId },
 		});
 
 		expect(rows).toHaveLength(1);
 		expect(rows[0]?.role).toBe("admin");
 	});
 
-	it("joins someone who signs up later as a member", async () => {
-		await ensureWorkspaceMembership(secondId);
-
-		const laterId = await seedUser("later", new Date("2026-01-01T00:00:00Z"));
-
-		await ensureWorkspaceMembership(laterId);
-
-		expect(await roleOf(laterId)).toBe("member");
-	});
-
 	it("leaves the owner alone when a later arrival signs in", async () => {
-		await ensureWorkspaceMembership(secondId);
+		const organizationId = await ensureOrganizationMembership(firstId);
 
 		const laterId = await seedUser("later", new Date("2026-01-01T00:00:00Z"));
-
-		await ensureWorkspaceMembership(laterId);
+		await ensureOrganizationMembership(laterId);
 
 		expect(await roleOf(firstId)).toBe("owner");
+		expect(await roleOf(laterId)).toBe("member");
 
 		const owners = await db.member.count({
-			where: { organizationId: WORKSPACE_ID, role: "owner" },
+			where: { organizationId, role: "owner" },
 		});
 
 		expect(owners).toBe(1);
+	});
+
+	it("does not create a second organization once one exists", async () => {
+		await ensureOrganizationMembership(firstId);
+		const before = await db.organization.count();
+
+		await ensureOrganizationMembership(secondId);
+
+		expect(await db.organization.count()).toBe(before);
 	});
 });
