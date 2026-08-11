@@ -5,7 +5,7 @@ import { Inject } from "@nestjs/common";
 export interface ProjectContext {
 	organizationId: string;
 	projectId: string;
-	role: WorkspaceRole;
+	role?: WorkspaceRole;
 }
 
 const storage = new AsyncLocalStorage<ProjectContext>();

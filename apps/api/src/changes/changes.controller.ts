@@ -49,7 +49,10 @@ export class ChangesController {
 			res.write(`event: change\ndata: ${JSON.stringify(event)}\n\n`);
 		});
 
-		const heartbeat = setInterval(() => res.write(": keep-alive\n\n"), HEARTBEAT_MS);
+		const heartbeat = setInterval(
+			() => res.write(": keep-alive\n\n"),
+			HEARTBEAT_MS,
+		);
 
 		req.on("close", () => {
 			clearInterval(heartbeat);

@@ -71,6 +71,16 @@ export class ProjectResolverService {
 		};
 	}
 
+	async defaultProjectFor(organizationId: string): Promise<string | null> {
+		const project = await this.db.project.findFirst({
+			where: { organizationId },
+			orderBy: { createdAt: "asc" },
+			select: { id: true },
+		});
+
+		return project?.id ?? null;
+	}
+
 	async listForUser(userId: string) {
 		const memberships = await this.db.member.findMany({
 			where: { userId },

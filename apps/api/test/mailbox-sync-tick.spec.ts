@@ -11,6 +11,7 @@ import {
 } from "../src/mailbox/sync-state.service";
 import type { MicrosoftConnectionService } from "../src/microsoft/microsoft-connection.service";
 import type { MicrosoftSyncService } from "../src/microsoft/microsoft-sync.service";
+import { ProjectResolverService } from "../src/projects/project-resolver.service";
 import { MailboxSyncService } from "../src/sync/mailbox-sync.service";
 
 type Outcome = {
@@ -111,6 +112,10 @@ const noConnections = {
 	reconcileAll: async () => undefined,
 };
 
+const projects = {
+	defaultProjectFor: async () => "project-under-test",
+};
+
 function build(
 	state: FakeState,
 	runOne: (userId: string, source: string) => Promise<Outcome | null>,
@@ -123,6 +128,7 @@ function build(
 		provider as unknown as MicrosoftSyncService,
 		noConnections as unknown as GoogleConnectionService,
 		noConnections as unknown as MicrosoftConnectionService,
+		projects as unknown as ProjectResolverService,
 	);
 }
 

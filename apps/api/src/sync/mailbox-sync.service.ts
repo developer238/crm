@@ -9,6 +9,8 @@ import {
 import { SyncStateService } from "../mailbox/sync-state.service";
 import { MicrosoftConnectionService } from "../microsoft/microsoft-connection.service";
 import { MicrosoftSyncService } from "../microsoft/microsoft-sync.service";
+import { runInProjectContext } from "../projects/project-context";
+import { ProjectResolverService } from "../projects/project-resolver.service";
 
 const TICK_BUDGET_MS = 60_000;
 
@@ -31,6 +33,7 @@ export class MailboxSyncService {
 		private readonly microsoft: MicrosoftSyncService,
 		private readonly googleConnections: GoogleConnectionService,
 		private readonly microsoftConnections: MicrosoftConnectionService,
+		private readonly projects: ProjectResolverService,
 	) {}
 
 	async runDue(): Promise<TickSummary> {
@@ -58,12 +61,28 @@ export class MailboxSyncService {
 				break;
 			}
 
+			const projectId = await this.projects.defaultProjectFor(
+				row.organizationId,
+			);
+
+			if (!projectId) {
+				this.logger.warn({
+					message: "Mailbox skipped: its organization has no project",
+					organizationId: row.organizationId,
+					userId: row.userId,
+				});
+				continue;
+			}
+
 			if (!(await this.state.claim(row, new Date()))) continue;
 
 			summary.attempted += 1;
 
 			try {
-				const outcome = await this.runOne(row.userId, row.source);
+				const outcome = await runInProjectContext(
+					{ organizationId: row.organizationId, projectId },
+					() => this.runOne(row.userId, row.source),
+				);
 
 				if (outcome === null || outcome.status === "skipped") {
 					summary.skipped += 1;
