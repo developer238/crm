@@ -143,6 +143,7 @@ enum RecordSource {
   IMPORT
   EMAIL
   CALENDAR
+  TRACKING
 }
 
 enum AgentConversationKind {
@@ -337,6 +338,8 @@ model Contact {
   calendarEvents  CalendarEvent[]
   eventAttendance CalendarAttendee[]
   fieldValues     FieldValue[]
+  visitors        TrackedVisitor[]   @relation("VisitorContact")
+  submissions     FormSubmission[]   @relation("SubmissionContact")
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -1307,9 +1310,161 @@ model AppSetting {
 
   ratesRefreshedAt DateTime?
 
+  trackingSiteId           String?  @unique
+  trackingCrossDomain      Boolean  @default(true)
+  trackingLimitToDomains   Boolean  @default(true)
+  trackingCookieSubdomains Boolean  @default(false)
+  trackingSecureCookies    Boolean  @default(true)
+  trackingHonourDnt        Boolean  @default(true)
+  trackingCookieDays       Int      @default(395)
+  trackingConfigHash       String?
+  trackingPaused           Boolean  @default(false)
+
   updatedAt DateTime @updatedAt
 
   @@map("appSetting")
+}
+
+enum DomainScope {
+  SITE_AND_SUBDOMAINS
+  EXACT_HOST
+}
+
+model TrackedDomain {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  host  String      @unique
+  scope DomainScope @default(EXACT_HOST)
+
+  pageViews  Int       @default(0)
+  lastSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@map("trackedDomain")
+}
+
+model TrackedVisitor {
+  id String @id
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation("VisitorContact", fields: [contactId], references: [id], onDelete: SetNull)
+
+  firstSource     String?
+  firstMedium     String?
+  firstCampaign   String?
+  firstTerm       String?
+  firstContent    String?
+  firstReferrer   String?
+  firstLanding    String?
+  firstTouchAt    DateTime?
+
+  lastSource   String?
+  lastMedium   String?
+  lastCampaign String?
+  lastTerm     String?
+  lastContent  String?
+  lastReferrer String?
+  lastLanding  String?
+  lastTouchAt  DateTime?
+
+  firstSeen DateTime @default(now())
+  lastSeen  DateTime @updatedAt
+
+  @@index([contactId])
+  @@index([projectId, firstSource])
+  @@map("trackedVisitor")
+}
+
+model TrackedEvent {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  visitorId String
+  type      String
+  host      String
+  path      String
+  referrer  String?
+  label     String?
+
+  source   String?
+  medium   String?
+  campaign String?
+
+  occurredAt DateTime
+
+  @@index([visitorId, occurredAt])
+  @@index([projectId, occurredAt])
+  @@index([projectId, host, occurredAt])
+  @@index([projectId, source, occurredAt])
+  @@map("trackedEvent")
+}
+
+model TrackingCounter {
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  key       String
+  value     Int      @default(0)
+  expiresAt DateTime
+
+  @@id([projectId, key])
+  @@index([expiresAt])
+  @@map("trackingCounter")
+}
+
+model TrackedPageDaily {
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  day      DateTime
+  host     String
+  path     String
+  views    Int      @default(0)
+  visitors Int      @default(0)
+
+  @@id([projectId, day, host, path])
+  @@index([projectId, host, day])
+  @@map("trackedPageDaily")
+}
+
+model FormSubmission {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  visitorId String?
+  contactId String?
+  contact   Contact? @relation("SubmissionContact", fields: [contactId], references: [id], onDelete: SetNull)
+
+  host  String
+  path  String
+  email String?
+
+  fields Json
+
+  firstTouch Json?
+  lastTouch  Json?
+
+  dedupeKey  String
+  filedAt    DateTime?
+  skipReason String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, dedupeKey])
+  @@index([contactId])
+  @@index([projectId, createdAt])
+  @@map("formSubmission")
 }
 
 model Install {
@@ -1412,6 +1567,13 @@ model Project {
 
   suppressedDomains  SuppressedDomain[]
   suppressedContacts SuppressedContact[]
+
+  trackedDomains    TrackedDomain[]
+  trackedVisitors   TrackedVisitor[]
+  trackedEvents     TrackedEvent[]
+  trackingCounters  TrackingCounter[]
+  trackedPagesDaily TrackedPageDaily[]
+  formSubmissions   FormSubmission[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])

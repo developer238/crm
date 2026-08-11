@@ -1,3 +1,5 @@
+Loaded Prisma config from prisma.config.ts.
+
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "crm";
 
@@ -11,7 +13,7 @@ CREATE TYPE "ActivityType" AS ENUM ('NOTE', 'CALL', 'EMAIL', 'MEETING', 'TASK', 
 CREATE TYPE "EnrichmentStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETE', 'FAILED', 'SKIPPED');
 
 -- CreateEnum
-CREATE TYPE "RecordSource" AS ENUM ('MANUAL', 'IMPORT', 'EMAIL', 'CALENDAR');
+CREATE TYPE "RecordSource" AS ENUM ('MANUAL', 'IMPORT', 'EMAIL', 'CALENDAR', 'TRACKING');
 
 -- CreateEnum
 CREATE TYPE "AgentConversationKind" AS ENUM ('RECORD', 'BUILDER');
@@ -66,6 +68,9 @@ CREATE TYPE "GoogleSyncStatus" AS ENUM ('IDLE', 'RUNNING', 'NEEDS_RECONNECT', 'F
 
 -- CreateEnum
 CREATE TYPE "EmailDirection" AS ENUM ('INBOUND', 'OUTBOUND');
+
+-- CreateEnum
+CREATE TYPE "DomainScope" AS ENUM ('SITE_AND_SUBDOMAINS', 'EXACT_HOST');
 
 -- CreateTable
 CREATE TABLE "user" (
@@ -793,9 +798,118 @@ CREATE TABLE "appSetting" (
     "contextDevApiKey" TEXT,
     "reportingCurrency" TEXT,
     "ratesRefreshedAt" TIMESTAMP(3),
+    "trackingSiteId" TEXT,
+    "trackingCrossDomain" BOOLEAN NOT NULL DEFAULT true,
+    "trackingLimitToDomains" BOOLEAN NOT NULL DEFAULT true,
+    "trackingCookieSubdomains" BOOLEAN NOT NULL DEFAULT false,
+    "trackingSecureCookies" BOOLEAN NOT NULL DEFAULT true,
+    "trackingHonourDnt" BOOLEAN NOT NULL DEFAULT true,
+    "trackingCookieDays" INTEGER NOT NULL DEFAULT 395,
+    "trackingConfigHash" TEXT,
+    "trackingPaused" BOOLEAN NOT NULL DEFAULT false,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "appSetting_pkey" PRIMARY KEY ("projectId")
+);
+
+-- CreateTable
+CREATE TABLE "trackedDomain" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "host" TEXT NOT NULL,
+    "scope" "DomainScope" NOT NULL DEFAULT 'EXACT_HOST',
+    "pageViews" INTEGER NOT NULL DEFAULT 0,
+    "lastSeenAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "trackedDomain_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "trackedVisitor" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "contactId" TEXT,
+    "firstSource" TEXT,
+    "firstMedium" TEXT,
+    "firstCampaign" TEXT,
+    "firstTerm" TEXT,
+    "firstContent" TEXT,
+    "firstReferrer" TEXT,
+    "firstLanding" TEXT,
+    "firstTouchAt" TIMESTAMP(3),
+    "lastSource" TEXT,
+    "lastMedium" TEXT,
+    "lastCampaign" TEXT,
+    "lastTerm" TEXT,
+    "lastContent" TEXT,
+    "lastReferrer" TEXT,
+    "lastLanding" TEXT,
+    "lastTouchAt" TIMESTAMP(3),
+    "firstSeen" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastSeen" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "trackedVisitor_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "trackedEvent" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "visitorId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "host" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "referrer" TEXT,
+    "label" TEXT,
+    "source" TEXT,
+    "medium" TEXT,
+    "campaign" TEXT,
+    "occurredAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "trackedEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "trackingCounter" (
+    "projectId" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "value" INTEGER NOT NULL DEFAULT 0,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "trackingCounter_pkey" PRIMARY KEY ("projectId","key")
+);
+
+-- CreateTable
+CREATE TABLE "trackedPageDaily" (
+    "projectId" TEXT NOT NULL,
+    "day" TIMESTAMP(3) NOT NULL,
+    "host" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "views" INTEGER NOT NULL DEFAULT 0,
+    "visitors" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "trackedPageDaily_pkey" PRIMARY KEY ("projectId","day","host","path")
+);
+
+-- CreateTable
+CREATE TABLE "formSubmission" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "visitorId" TEXT,
+    "contactId" TEXT,
+    "host" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "email" TEXT,
+    "fields" JSONB NOT NULL,
+    "firstTouch" JSONB,
+    "lastTouch" JSONB,
+    "dedupeKey" TEXT NOT NULL,
+    "filedAt" TIMESTAMP(3),
+    "skipReason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "formSubmission_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1279,6 +1393,48 @@ CREATE INDEX "calendarAttendee_projectId_idx" ON "calendarAttendee"("projectId")
 CREATE UNIQUE INDEX "calendarAttendee_eventId_email_key" ON "calendarAttendee"("eventId", "email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "appSetting_trackingSiteId_key" ON "appSetting"("trackingSiteId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "trackedDomain_host_key" ON "trackedDomain"("host");
+
+-- CreateIndex
+CREATE INDEX "trackedDomain_projectId_idx" ON "trackedDomain"("projectId");
+
+-- CreateIndex
+CREATE INDEX "trackedVisitor_contactId_idx" ON "trackedVisitor"("contactId");
+
+-- CreateIndex
+CREATE INDEX "trackedVisitor_projectId_firstSource_idx" ON "trackedVisitor"("projectId", "firstSource");
+
+-- CreateIndex
+CREATE INDEX "trackedEvent_visitorId_occurredAt_idx" ON "trackedEvent"("visitorId", "occurredAt");
+
+-- CreateIndex
+CREATE INDEX "trackedEvent_projectId_occurredAt_idx" ON "trackedEvent"("projectId", "occurredAt");
+
+-- CreateIndex
+CREATE INDEX "trackedEvent_projectId_host_occurredAt_idx" ON "trackedEvent"("projectId", "host", "occurredAt");
+
+-- CreateIndex
+CREATE INDEX "trackedEvent_projectId_source_occurredAt_idx" ON "trackedEvent"("projectId", "source", "occurredAt");
+
+-- CreateIndex
+CREATE INDEX "trackingCounter_expiresAt_idx" ON "trackingCounter"("expiresAt");
+
+-- CreateIndex
+CREATE INDEX "trackedPageDaily_projectId_host_day_idx" ON "trackedPageDaily"("projectId", "host", "day");
+
+-- CreateIndex
+CREATE INDEX "formSubmission_contactId_idx" ON "formSubmission"("contactId");
+
+-- CreateIndex
+CREATE INDEX "formSubmission_projectId_createdAt_idx" ON "formSubmission"("projectId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "formSubmission_projectId_dedupeKey_key" ON "formSubmission"("projectId", "dedupeKey");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "install_uuid_key" ON "install"("uuid");
 
 -- CreateIndex
@@ -1610,6 +1766,30 @@ ALTER TABLE "suppressedContact" ADD CONSTRAINT "suppressedContact_projectId_fkey
 
 -- AddForeignKey
 ALTER TABLE "appSetting" ADD CONSTRAINT "appSetting_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "trackedDomain" ADD CONSTRAINT "trackedDomain_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "trackedVisitor" ADD CONSTRAINT "trackedVisitor_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "trackedVisitor" ADD CONSTRAINT "trackedVisitor_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "trackedEvent" ADD CONSTRAINT "trackedEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "trackingCounter" ADD CONSTRAINT "trackingCounter_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "trackedPageDaily" ADD CONSTRAINT "trackedPageDaily_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "formSubmission" ADD CONSTRAINT "formSubmission_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "formSubmission" ADD CONSTRAINT "formSubmission_contactId_fkey" FOREIGN KEY ("contactId") REFERENCES "contact"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "project" ADD CONSTRAINT "project_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;

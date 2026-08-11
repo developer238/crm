@@ -35,6 +35,10 @@ export function canManageProjects(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export function canManageTracking(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
+
 export function organizationSlug(name: string): string {
 	const base = name
 		.normalize("NFKD")
